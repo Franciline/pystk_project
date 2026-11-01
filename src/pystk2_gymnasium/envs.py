@@ -387,12 +387,12 @@ class BaseSTKRaceEnv(gym.Env[Any, STKAction]):
 
         d_t = max(0, kart.overall_distance)
         f_t = 1 if terminated else 0
-        reward = (
-            (d_t - self.last_overall_distances[kart_ix]) / 10.0
-            + (1.0 - kart.position / self.num_kart) * (3 + 7 * f_t)
-            - 0.1
-            + 10 * f_t
-        )
+        reward = ( # reward here
+                    (d_t - self.last_overall_distances[kart_ix]) / 10.0
+                    # + (1.0 - kart.position / self.num_kart) * (3 + 7 * f_t) removed for single kart 
+                    - 0.1
+                    + 10 * f_t
+                )
         return (
             obs,
             reward,
