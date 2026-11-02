@@ -19,6 +19,9 @@ BONUS_BOX = 0
 BUBBLEGUM_SHIELD = 6
 SWATTER_ATTACHMENT = 3
 
+# Sans adversaire (course solo), karts_position est vide : kart fictif à z=0, donc aucun tir.
+NO_KART = np.zeros(3)
+
 
 class AgentItems(KartAgent) : 
 
@@ -70,7 +73,7 @@ class AgentItems(KartAgent) :
             return action
 
         if current_item == CAKE :
-            premier_kart = obs["karts_position"][0]
+            premier_kart = next(iter(obs["karts_position"]), NO_KART)
             if premier_kart[self.conf.z] < 0:
                 action["fire"] = False
                 return action 
@@ -84,7 +87,7 @@ class AgentItems(KartAgent) :
             if obs["powerup_count"] > 1:
                 action["fire"] = True
                 return action
-            premier_kart = obs["karts_position"][0]
+            premier_kart = next(iter(obs["karts_position"]), NO_KART)
             if premier_kart[self.conf.z] < 0:
                 action["fire"] = False
             if self.is_bonus_close(obs) : 
@@ -109,7 +112,7 @@ class AgentItems(KartAgent) :
             if obs["powerup_count"] > 1 or self.is_bonus_close(obs):
                 action["fire"] = True
                 return action
-            premier_kart = obs["karts_position"][0]
+            premier_kart = next(iter(obs["karts_position"]), NO_KART)
             if premier_kart[self.conf.z] < 0:
                 action["fire"] = False
             for kart in obs["karts_position"]:
@@ -138,13 +141,13 @@ class AgentItems(KartAgent) :
             return action
 
         if current_item == RUBBERBALL :
-            premier_kart = obs["karts_position"][0]
+            premier_kart = next(iter(obs["karts_position"]), NO_KART)
             if premier_kart[self.conf.z] > 0:
                 action["fire"] = True
             return action
 
         if current_item == PARACHUTE :
-            premier_kart = obs["karts_position"][0]
+            premier_kart = next(iter(obs["karts_position"]), NO_KART)
             if premier_kart[self.conf.z] > 0:
                 action["fire"] = True
             return action

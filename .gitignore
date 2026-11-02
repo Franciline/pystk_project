@@ -19,3 +19,6 @@ pyproject.toml
 /docs/
 
 src/agents/team1/docs/
+
+.claude/
+datasets/
