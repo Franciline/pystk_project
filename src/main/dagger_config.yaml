@@ -8,3 +8,20 @@ seed: 0        # Episode seeds increment across all iterations.
 track: abyss
 step_size: 0.1
 output_dir: datasets/dagger
+
+actor:
+  num_paths: 182
+  num_items: 10
+  hidden_sizes: [256, 256]
+  learning_rate: 0.001
+  batch_size: 128
+  epochs: 10
+  continuous_weight: 1.0
+  boolean_weight: 1.0
+  device: auto # or cpu
+
+# Validation seeds are fixed and separate from collection seeds.
+evaluation:
+  seeds: [10000, 10001, 10002, 10003, 10004]
+  min_steps_improvement: 1.0
+  patience: 5

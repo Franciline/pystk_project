@@ -17,12 +17,14 @@ class ObservationNormalizer:
         Padding does not contribute. Constant/unseen features use scale 1.
         A fitted normalizer cannot be refitted accidentally.
         """
+
         if self.mean is not None:
             raise RuntimeError('Statistics are frozen; create a new normalizer to refit')
         count = np.zeros(self.encoder.output_size, dtype=np.int64)
         mean = np.zeros(self.encoder.output_size, dtype=np.float64)
         m2 = np.zeros_like(mean)
         seen = False
+
         for obs in observations:
             vector = self.encoder.encode(obs).astype(np.float64)
             mask = self.encoder.normalization_mask(vector)
@@ -31,8 +33,10 @@ class ObservationNormalizer:
             mean[mask] += delta / count[mask]
             m2[mask] += delta * (vector[mask] - mean[mask])
             seen = True
+
         if not seen:
             raise ValueError('Cannot fit on empty training data')
+        
         variance = np.divide(m2, count, out=np.zeros_like(m2), where=count > 0)
         scale = np.sqrt(np.maximum(variance, 0))
         scale[scale < 1e-6] = 1
@@ -43,10 +47,13 @@ class ObservationNormalizer:
         """Normalize an encoded vector; preserve categories, masks and padding."""
         if self.mean is None:
             raise RuntimeError('Fit or load statistics first')
+        
         result = np.array(vector, dtype=np.float32, copy=True)
         mask = self.encoder.normalization_mask(result)
+
         if not np.isfinite(result).all():
             raise ValueError('Non-finite encoded observation')
+        
         result[mask] = (result[mask] - self.mean[mask]) / self.scale[mask]
         return result
 

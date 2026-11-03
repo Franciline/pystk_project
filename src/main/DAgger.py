@@ -7,6 +7,7 @@ import argparse
 from copy import deepcopy
 import csv
 import json
+import shutil
 from pathlib import Path
 import random
 import sys
@@ -18,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from agents.team4.agent4 import Agent4
 from pystk2_gymnasium.envs import STKRaceEnv, AgentSpec
 from utils.dataset_recorder import DatasetRecorder
+from utils.dagger_evaluation import evaluate_policy, is_improvement, append_metrics
 
 CONFIG_PATH = Path(__file__).with_name('dagger_config.yaml')
 BUTTONS = ('brake', 'drift', 'fire', 'nitro', 'rescue')
@@ -113,6 +115,17 @@ def run_dagger(config, *, learner=None, train_policy=None):
     if iterations > 1 and (learner is None or train_policy is None):
         raise ValueError('Multiple iterations require learner and train_policy')
     
+    evaluation = config.get('evaluation')
+    if evaluation is not None:
+        if learner is None or train_policy is None:
+            raise ValueError('Evaluation requires a learner and training callback')
+        seeds = evaluation['seeds']
+        if (not seeds or len(set(seeds)) != len(seeds)
+                or evaluation['patience'] < 1 or evaluation['min_steps_improvement'] < 0):
+            raise ValueError('Invalid evaluation settings')
+        if any(seed <= s < seed + iterations * trajectories for s in seeds):
+            raise ValueError('Evaluation seeds overlap collection seeds')
+    best, stale = None, 0
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
@@ -148,8 +161,30 @@ def run_dagger(config, *, learner=None, train_policy=None):
                     
                     with (output_dir / 'episodes.json').open('w') as manifest:
                         json.dump([str(p.relative_to(output_dir)) for p in paths], manifest, indent=2)
+
                 if train_policy is not None:
                     train_policy(learner, tuple(paths), iteration)
+
+                if evaluation is not None:
+                    rows, summary = evaluate_policy(env, learner, seeds, max_steps, to_action)
+                    improved = is_improvement(summary, best, evaluation['min_steps_improvement'])
+                    append_metrics(output_dir / 'evaluation_episodes.csv',
+                                   [dict(iteration=iteration, **row) for row in rows])
+                    append_metrics(output_dir / 'evaluation.csv', [dict(
+                        iteration=iteration, training_steps=total, **summary, improved=improved)])
+                    print(f"Evaluation {iteration}: completion={summary['completion_rate']:.0%}, "
+                          f"steps={summary['steps_mean']:.2f}, finish steps={summary['finish_steps_mean']}", flush=True)
+                    if improved:
+                        best, stale = summary, 0
+                        shutil.copyfile(output_dir / f'actor_iteration_{iteration}.pt',
+                                        output_dir / 'actor_best.pt')
+                        with (output_dir / 'best_evaluation.json').open('w') as best_file:
+                            json.dump(dict(iteration=iteration, **summary), best_file, indent=2)
+                    else:
+                        stale += 1
+                    if stale >= evaluation['patience']:
+                        print(f'Early stopping: {stale} evaluations without improvement', flush=True)
+                        break
     finally:
         env.close()
     return paths
@@ -160,4 +195,9 @@ if __name__ == '__main__':
     parser.add_argument('--config', type=Path, default=CONFIG_PATH)
     args = parser.parse_args()
     config = OmegaConf.to_container(OmegaConf.load(args.config), resolve=True)
-    run_dagger(config)
+    from agents.dagger_actor import ActorPolicy, train_policy
+    output_dir = Path(config['output_dir'])
+    if not output_dir.is_absolute():
+        output_dir = Path(__file__).resolve().parents[2] / output_dir
+    learner = ActorPolicy(config['actor'], output_dir, config['seed'])
+    run_dagger(config, learner=learner, train_policy=train_policy)

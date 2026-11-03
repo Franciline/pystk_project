@@ -8,3 +8,5 @@ pysupertuxkart2
 pytz
 requests
 omegaconf
+
+torch
