@@ -1,0 +1,10 @@
+# Collection iterations and trajectories per iteration.
+N: 1
+T: 1
+max_steps: 1000
+beta_decay: 0.5  # beta_i = beta_decay ** (i - 1); first iteration expert-only, divides by 2
+seed: 0        # Episode seeds increment across all iterations.
+
+track: abyss
+step_size: 0.1
+output_dir: datasets/dagger
