@@ -69,6 +69,27 @@ class ActorPolicy:
             **{key: bool(outputs[i + 2] > 0) for i, key in enumerate(BUTTONS)},
         }
 
+    @classmethod
+    def load(cls, path, device='auto'):
+        """Restore inference weights and normalization from a trusted checkpoint."""
+        checkpoint = torch.load(path, map_location='cpu', weights_only=True)
+        config = dict(checkpoint['config'], device=device)
+        policy = cls(config, Path(path).parent, checkpoint['seed'])
+        if checkpoint['categories'] != policy.encoder.categories:
+            raise ValueError('Checkpoint categories differ from installed PySTK')
+        policy.model.load_state_dict(checkpoint['model'])
+        policy.normalizer.mean = checkpoint['normalizer_mean'].cpu().numpy().copy()
+        policy.normalizer.scale = checkpoint['normalizer_scale'].cpu().numpy().copy()
+        if (policy.normalizer.mean.shape != (policy.encoder.output_size,)
+                or policy.normalizer.scale.shape != policy.normalizer.mean.shape
+                or not np.isfinite(policy.normalizer.mean).all()
+                or not np.isfinite(policy.normalizer.scale).all()
+                or np.any(policy.normalizer.scale <= 0)):
+            raise ValueError('Invalid checkpoint normalization statistics')
+        policy.model.eval()
+        policy.name = 'DAgger actor'
+        return policy
+
     @staticmethod
     def _pairs(paths):
         # Trusted self-collected pickle files only. Load one episode at a time.
