@@ -1,9 +1,10 @@
-"""Display a saved DAgger actor or Team4 for one lap, optionally recording."""
+"""Display a saved actor or Team4 for one lap, optionally recording."""
 
 import argparse
 import json
 from copy import deepcopy
 import sys, os
+import time
 from pathlib import Path
 
 # Append the "src" folder to sys.path.
@@ -45,7 +46,7 @@ def create_race(policy=None, track="abyss", step_size=0.1):
     return env, agents, names
 
 
-def single_race(env, agents, names, output, seed=None, max_steps=MAX_STEPS, actor=False):
+def single_race(env, agents, names, output, seed=None, max_steps=MAX_STEPS, actor=False, delay=0):
     obs, _ = env.reset(seed=seed)
     recorder = DatasetRecorder() if output is not None else None
     expert = Agent4(env, path_lookahead=3) if actor and recorder is not None else None
@@ -63,6 +64,7 @@ def single_race(env, agents, names, output, seed=None, max_steps=MAX_STEPS, acto
         label = expert.choose_action(deepcopy(obs["0"])) if expert is not None else None
         action = agents[0].choose_action(obs["0"])
         obs, _, terminated, truncated, info = env.step({"0": action})
+        time.sleep(delay)  # slow down the display
         truncated = truncated or (step + 1 == max_steps and not terminated)
         if recorder is not None:
             recorder.record_step(
@@ -76,16 +78,31 @@ def single_race(env, agents, names, output, seed=None, max_steps=MAX_STEPS, acto
         recorder.save_episode(output)
         print(f"Saved {step + 1} steps to {output}")
 
-def main_loop(output, checkpoint=None, seed=None, device='auto', track=None):
+def load_rlpd(checkpoint, config):
+    # rebuild the RLPD agent with the run's own settings
+    from agents.rlpd_agent import RLPDAgent
+    from utils.observation_encoder import ObservationEncoder
+    from utils.observation_normalizer import ObservationNormalizer
+    encoder = ObservationEncoder(config['encoder']['num_paths'], config['encoder']['num_items'])
+    normalizer = ObservationNormalizer.load(checkpoint.parent / 'normalizer.npz', encoder)
+    policy = RLPDAgent(config, encoder, normalizer, config['seed'])
+    policy.load(checkpoint)
+    return policy
+
+
+def main_loop(output, checkpoint=None, seed=None, device='auto', track=None, delay=0):
     policy = None
     track_override = track
     track, step_size, max_steps = 'abyss', 0.1, MAX_STEPS
     if checkpoint is not None:
-        from agents.dagger_actor import ActorPolicy
-        policy = ActorPolicy.load(checkpoint, device=device)
         config_path = checkpoint.parent / 'config.json'
-        if config_path.exists():
-            config = json.loads(config_path.read_text())
+        config = json.loads(config_path.read_text()) if config_path.exists() else {}
+        if 'rlpd' in config:  # RLPD run folder
+            policy = load_rlpd(checkpoint, config)
+        else:
+            from agents.dagger_actor import ActorPolicy
+            policy = ActorPolicy.load(checkpoint, device=device)
+        if config:
             track = config['train_tracks'][0] if 'train_tracks' in config else config['track']
             step_size, max_steps = config['step_size'], config['max_steps']
     if track_override is not None:
@@ -95,7 +112,7 @@ def main_loop(output, checkpoint=None, seed=None, device='auto', track=None):
     try:
         # print("Observation space:", env.observation_space)
         # print("Action space:", env.action_space)
-        single_race(env, agents, names, output, seed, max_steps, actor=checkpoint is not None)
+        single_race(env, agents, names, output, seed, max_steps, actor=checkpoint is not None, delay=delay)
     finally:
         env.close()
 
@@ -106,5 +123,6 @@ if __name__ == "__main__":
     parser.add_argument("--track", help="Override the experiment track, e.g. minigolf")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--device", choices=['auto', 'cpu', 'mps'], default='auto')
+    parser.add_argument("--delay", type=float, default=0, help="Seconds to pause per step; 0.1 is about real speed")
     args = parser.parse_args()
     main_loop(**vars(args))

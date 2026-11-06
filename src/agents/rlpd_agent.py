@@ -166,3 +166,8 @@ class RLPDAgent:
             'normalizer_mean': torch.from_numpy(self.normalizer.mean.copy()),
             'normalizer_scale': torch.from_numpy(self.normalizer.scale.copy()),
         }, path)
+
+    def load(self, path):
+        # actor only enough to evaluate but can't resume training from this
+        state = torch.load(path, map_location='cpu')  # normalizer is float64, mps can't hold it
+        self.actor.load_state_dict(state['actor'])

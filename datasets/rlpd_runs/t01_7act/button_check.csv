@@ -1,0 +1,4 @@
+checkpoint,off,episodes,completed,completion_rate,timeouts,steps_mean,steps_std,finish_steps_mean,finish_steps_std
+agent_last.pt,none,5,0,0.0,5,1000.0,0.0,,
+agent_last.pt,rescue,5,0,0.0,5,1000.0,0.0,,
+agent_last.pt,brake+drift+fire+nitro+rescue,5,0,0.0,5,1000.0,0.0,,
