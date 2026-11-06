@@ -1,0 +1,55 @@
+{
+  "track": "abyss",
+  "step_size": 0.1,
+  "max_steps": 1000,
+  "seed": 0,
+  "output_dir": "datasets/rlpd_runs/t01_2act",
+  "encoder": {
+    "num_paths": 182,
+    "num_items": 10
+  },
+  "evaluation": {
+    "seeds": [
+      10000,
+      10001,
+      10002,
+      10003,
+      10004
+    ],
+    "min_steps_improvement": 1.0
+  },
+  "offline": {
+    "agents": [
+      "team4"
+    ],
+    "epsilons": [
+      0.0,
+      0.1,
+      0.3
+    ]
+  },
+  "learned_actions": [
+    "acceleration",
+    "steer"
+  ],
+  "total_env_steps": 15000,
+  "eval_every": 5000,
+  "online_seed_start": 100,
+  "rlpd": {
+    "hidden_sizes": [
+      256,
+      256
+    ],
+    "batch_size": 256,
+    "utd_ratio": 10,
+    "num_critics": 10,
+    "num_min_critics": 2,
+    "gamma": 0.99,
+    "tau": 0.005,
+    "actor_lr": 0.0003,
+    "critic_lr": 0.0003,
+    "temperature_lr": 0.0003,
+    "init_temperature": 0.1,
+    "device": "auto"
+  }
+}

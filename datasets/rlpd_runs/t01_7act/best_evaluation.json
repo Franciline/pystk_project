@@ -1,0 +1,11 @@
+{
+  "env_steps": 5000,
+  "episodes": 5,
+  "completed": 5,
+  "completion_rate": 1.0,
+  "timeouts": 0,
+  "steps_mean": 671.2,
+  "steps_std": 13.863621460498694,
+  "finish_steps_mean": 671.2,
+  "finish_steps_std": 13.863621460498694
+}

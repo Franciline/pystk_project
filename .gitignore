@@ -21,4 +21,11 @@ pyproject.toml
 src/agents/team1/docs/
 
 .claude/
-datasets/
+
+# Results runs
+datasets/rlpd_runs/smoke*
+datasets/rlpd
+datasets/*/*/*.pt
+datasets/*/*/*.npz
+
+*.DS_STORE

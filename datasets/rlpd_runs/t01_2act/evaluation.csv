@@ -1,0 +1,4 @@
+env_steps,train_episodes,episodes,completed,completion_rate,timeouts,steps_mean,steps_std,finish_steps_mean,finish_steps_std,improved
+5921,6,5,5,1.0,0,626.6,0.5477225575051662,626.6,0.5477225575051662,True
+10266,13,5,5,1.0,0,582.0,0.7071067811865476,582.0,0.7071067811865476,True
+15561,22,5,5,1.0,0,578.8,0.4472135954999579,578.8,0.4472135954999579,True

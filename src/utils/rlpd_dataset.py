@@ -4,15 +4,13 @@ import numpy as np
 import gzip
 from pathlib import Path
 import pickle
+from agents.rlpd_agent import action_to_vector
 
 DATASET_DIR = Path(__file__).resolve().parents[2] / "datasets" / "rlpd"
 
 
 def load_episodes(root=DATASET_DIR, agents=None, epsilons=None, tracks=None):
-    """load episodes and their metadata that matches every given filter; None keeps all.
-
-    files are pickles: load only self-collected, trusted data.
-    """
+    """load episodes and their metadata matching the filter; None keeps all"""
     episodes = []
     for path in sorted(Path(root).rglob("*.pkl.gz")):
         with gzip.open(path, "rb") as file:
@@ -31,8 +29,7 @@ def episode_id(meta):
 
 def to_transitions(episodes):
     """flatten episodes into columns: one list per field, one entry per transition.
-
-    for TD targets use done = terminated; truncated only marks the time limit.
+    for TD targets use done = terminated; truncated only marks the time limit
     """
     columns = {key: [] for key in (
         "obs", "action", "expert_action", "reward", "next_obs",
@@ -50,3 +47,36 @@ def to_transitions(episodes):
         columns["episode_id"] += [episode_id(episode["metadata"])] * n
         columns["step_id"] += list(range(n))
     return columns
+
+def drop_duplicates(episodes):
+    """keep the first of each group of identical episodes (same actions, rewards, progress)"""
+    seen, unique = set(), []
+    for episode in episodes:
+        # progress along the track at each step: catches same actions but different outcome
+        progress = [float(np.ravel(obs["distance_down_track"])[0]) for obs in episode["observations"]]
+        key = pickle.dumps((episode["actions"], episode["rewards"], progress))
+        if key not in seen:  # first time we see this exact episode
+            seen.add(key)
+            unique.append(episode)
+    return unique
+
+def build_offline_buffer(episodes, encoder, normalizer, learned):
+    """encode episodes into float32 arrays: obs, action, reward, next_obs, terminated.
+    uses executed actions (they produced reward/next_obs), not expert labels.
+    """
+    obs, actions, rewards, next_obs, terminated = [], [], [], [], []
+    for episode in episodes:
+        #   encode each of the N+1 observations once, then reuse for obs and next_obs
+        encoded = [normalizer.transform(encoder.encode(o)) for o in episode["observations"]]
+        obs += encoded[:-1]
+        next_obs += encoded[1:]
+        actions += [action_to_vector(a, learned) for a in episode["actions"]]
+        rewards += episode["rewards"]
+        terminated += episode["terminated"]
+    return {
+        "obs": np.stack(obs),
+        "action": np.stack(actions),
+        "reward": np.array(rewards, dtype=np.float32),
+        "next_obs": np.stack(next_obs),
+        "terminated": np.array(terminated, dtype=np.float32),  # 1.0 = lap finished (done)
+    }
