@@ -76,8 +76,9 @@ def single_race(env, agents, names, output, seed=None, max_steps=MAX_STEPS, acto
         recorder.save_episode(output)
         print(f"Saved {step + 1} steps to {output}")
 
-def main_loop(output, checkpoint=None, seed=None, device='auto'):
+def main_loop(output, checkpoint=None, seed=None, device='auto', track=None):
     policy = None
+    track_override = track
     track, step_size, max_steps = 'abyss', 0.1, MAX_STEPS
     if checkpoint is not None:
         from agents.dagger_actor import ActorPolicy
@@ -85,8 +86,11 @@ def main_loop(output, checkpoint=None, seed=None, device='auto'):
         config_path = checkpoint.parent / 'config.json'
         if config_path.exists():
             config = json.loads(config_path.read_text())
-            track, step_size, max_steps = config['track'], config['step_size'], config['max_steps']
-        print(f'Loaded {checkpoint}; track={track}, max_steps={max_steps}')
+            track = config['train_tracks'][0] if 'train_tracks' in config else config['track']
+            step_size, max_steps = config['step_size'], config['max_steps']
+    if track_override is not None:
+        track = track_override
+    print(f'Policy={checkpoint or "Team4"}; track={track}, max_steps={max_steps}')
     env, agents, names = create_race(policy, track, step_size)
     try:
         # print("Observation space:", env.observation_space)
@@ -99,6 +103,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, help="Optional recording destination")
     parser.add_argument("--checkpoint", type=Path, help="Saved actor .pt; otherwise drive with Team4")
+    parser.add_argument("--track", help="Override the experiment track, e.g. minigolf")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--device", choices=['auto', 'cpu', 'mps'], default='auto')
     args = parser.parse_args()

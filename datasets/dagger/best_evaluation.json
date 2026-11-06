@@ -1,0 +1,27 @@
+{
+  "iteration": 3,
+  "completion_rate": 1.0,
+  "relative_finish_steps": 0.9780260318103824,
+  "completed_episodes": [
+    [
+      "abyss",
+      10000
+    ],
+    [
+      "minigolf",
+      10000
+    ],
+    [
+      "lighthouse",
+      10000
+    ],
+    [
+      "hacienda",
+      10000
+    ],
+    [
+      "zengarden",
+      10000
+    ]
+  ]
+}

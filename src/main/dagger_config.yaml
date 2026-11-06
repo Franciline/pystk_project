@@ -1,16 +1,17 @@
 # Collection iterations and trajectories per iteration.
-N: 4
+N: 5
 T: 2  # Learner episodes per later iteration.
 max_steps: 1000
 initial_trajectories: 1  # First iteration expert-only; later iterations learner-only.
 seed: 0        # Episode seeds increment across all iterations.
 
-track: abyss
+train_tracks: [abyss, minigolf, lighthouse, hacienda, zengarden]
+unseen_tracks: [snowtuxpeak]
 step_size: 0.1
-output_dir: datasets/dagger
+output_dir: datasets/dagger5seeds
 
 actor:
-  num_paths: 100
+  num_paths: 20
   num_items: 10
   hidden_sizes: [256, 256]
   learning_rate: 0.001
@@ -22,6 +23,9 @@ actor:
 
 # Validation seeds are fixed and separate from collection seeds.
 evaluation:
-  tracks: [abyss, minigolf]  # Only training-track results select best checkpoint.
-  seeds: [10000]  # Add seeds to measure variation.
-  min_steps_improvement: 1.0
+  seeds: [10000, 10001, 10002, 10003, 10004]  # Add seeds to measure variation.
+  min_relative_improvement: 0.01  # Absolute decrease in mean actor/expert step ratio.
+
+expert_benchmark:
+  runs: 5  # Per training and unseen map, before training.
+  seed_start: 10000

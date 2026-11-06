@@ -1,0 +1,6 @@
+iteration,training_steps,completion_rate,relative_finish_steps,improved
+1,2391,0.6,,True
+2,9428,1.0,1.040605188085618,True
+3,14334,1.0,0.9780260318103824,True
+4,19542,0.8,,False
+5,26102,0.6,,False
