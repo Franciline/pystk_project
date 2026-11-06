@@ -5,7 +5,7 @@ import random
 import numpy as np
 
 
-def evaluate_policy(env, learner, seeds, max_steps, to_action):
+def evaluate_policy(env, learner, seeds, max_steps, to_action, policy_factory=None):
     if not seeds or max_steps < 1:
         raise ValueError('Evaluation needs seeds and a positive step limit')
     rows = []
@@ -16,10 +16,11 @@ def evaluate_policy(env, learner, seeds, max_steps, to_action):
             np.random.seed(seed)
             env.action_space.seed(seed)
             obs, _ = env.reset(seed=seed)
-            if hasattr(learner, 'reset_episode'):
-                learner.reset_episode()
+            policy = policy_factory(env) if policy_factory is not None else learner
+            if hasattr(policy, 'reset_episode'):
+                policy.reset_episode()
             for step in range(max_steps):
-                action = to_action(learner.choose_action(obs))
+                action = to_action(policy.choose_action(obs))
                 obs, _, terminated, truncated, _ = env.step(action)
                 truncated = bool(truncated or (step + 1 == max_steps and not terminated))
                 if terminated or truncated:

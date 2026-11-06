@@ -16,9 +16,9 @@ Only CLI option: `--config`, the YAML configuration path. Defaults to `dagger_co
 | Parameter | Meaning |
 |---|---|
 | `N` | Maximum DAgger iterations: collect, train, evaluate |
-| `T` | Collection episodes per iteration |
+| `T` | Learner-driven collection episodes per iteration after the first |
+| `initial_trajectories` | Expert-driven episodes in iteration 1 |
 | `max_steps` | Step limit per collection/evaluation episode |
-| `beta_decay` | Expert execution probability: `beta_decay ** (iteration - 1)`; first iteration expert-only. Expert labels every collection step. |
 | `seed` | Base collection seed; increments each episode; also seeds actor initialization |
 | `track` | Track identifier, currently `abyss` |
 | `step_size` | Simulation step duration in seconds |
@@ -30,13 +30,13 @@ Only CLI option: `--config`, the YAML configuration path. Defaults to `dagger_co
 | `actor.epochs` | Full passes through aggregated training data per iteration |
 | `actor.continuous_weight`, `actor.boolean_weight` | Weights for continuous MSE and Boolean BCE losses |
 | `actor.device` | `auto`: MPS when available, otherwise CPU; `cpu`: force CPU |
+| `evaluation.tracks` | Maps to evaluate; must include training `track`. Other maps are diagnostic only. |
 | `evaluation.seeds` | Fixed validation seeds, separate from all collection seeds |
 | `evaluation.min_steps_improvement` | Required decrease in mean successful finishing steps when completion rate is tied |
-| `evaluation.patience` | Stop after this many consecutive evaluations without improvement |
 
 Saves episodes under `iteration_*/`, `episodes.json`, `config.json`, collection `metrics.csv`, `losses.csv`, `normalizer.npz`, and `actor_iteration_*.pt`. Evaluation writes `evaluation_episodes.csv`, `evaluation.csv`, `best_evaluation.json`, and `actor_best.pt`.
 
-Best model: higher completion rate first, then fewer mean finishing steps. Evaluation reports steps for all episodes and successful episodes separately, with sample standard deviations. Evaluation episodes never enter training. Existing experiment configuration is not overwritten; resume is not implemented.
+Best model: training-map completion rate first, then fewer mean finishing steps. All N iterations run, each training for actor.epochs; there is no early stopping. Evaluation CSVs include track identifiers. Evaluation reports steps for all episodes and successful episodes separately, with sample standard deviations. Evaluation episodes never enter training. Existing experiment configuration is not overwritten; resume is not implemented.
 
 ## One displayed demonstration — `single_track_race_display.py`
 
@@ -114,3 +114,16 @@ Loads network weights and normalization from the checkpoint. Reads track, step d
 - `--seed`: optional simulator seed.
 - `--device`: `auto` (MPS if available, otherwise CPU), `cpu`, or `mps`.
 - `--output`: optional episode recording. When recording actor driving, Team4 supplies separate expert labels; it does not control the kart.
+
+## Expert performance baseline — `benchmark_expert.py`
+
+Run Team4 alone on each `evaluation.tracks` map, with a fresh expert per episode. Task settings (`max_steps`, `step_size`, one kart, one lap) match DAgger. Episodes are evaluated only and never added to training.
+
+```bash
+uv run src/main/benchmark_expert.py --runs 5
+uv run src/main/benchmark_expert.py --config src/main/dagger_config.yaml --runs 5 --seed-start 10000 --output-dir datasets/expert_benchmark_2
+```
+
+Options: `--config` selects YAML; `--runs` defaults to 5 episodes per map; `--seed-start` defaults to 10000 and seeds increment per episode; `--output-dir` defaults to `datasets/expert_benchmark/`. Use a fresh directory.
+
+Saves `episodes.csv`, `summary.csv`, and `config.json`. Per-map completion rate and mean successful finishing steps can be plotted as horizontal expert baselines, with standard-deviation bands when available.

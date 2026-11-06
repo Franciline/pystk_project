@@ -98,18 +98,19 @@ def collect_episode(env, learner, *, beta, seed, max_steps, output, iteration, s
 def run_dagger(config, *, learner=None, train_policy=None):
     """Aggregate episode paths; train_policy(learner, paths, iteration) updates actor.
 
-    Iteration 1 is expert-only. Later beta = beta_decay ** (iteration - 1).
+    Iteration 1 is expert-only; later iterations are learner-only, with expert labels.
     Multi-iteration runs require training code; no untrained/random substitute.
     """
     iterations, trajectories = config['N'], config['T']
-    max_steps, beta_decay = config['max_steps'], config['beta_decay']
+    max_steps = config['max_steps']
+    initial_trajectories = config['initial_trajectories']
     seed, track, step_size = config['seed'], config['track'], config['step_size']
     output_dir = Path(config['output_dir'])
     if not output_dir.is_absolute():
         output_dir = Path(__file__).resolve().parents[2] / output_dir
     if step_size <= 0:
         raise ValueError('step_size must be positive')
-    if iterations < 1 or trajectories < 1 or max_steps < 1 or not 0 <= beta_decay <= 1:
+    if iterations < 1 or trajectories < 1 or max_steps < 1 or initial_trajectories < 1:
         raise ValueError('Invalid iteration, trajectory, step, or beta settings')
     
     if iterations > 1 and (learner is None or train_policy is None):
@@ -121,11 +122,13 @@ def run_dagger(config, *, learner=None, train_policy=None):
             raise ValueError('Evaluation requires a learner and training callback')
         seeds = evaluation['seeds']
         if (not seeds or len(set(seeds)) != len(seeds)
-                or evaluation['patience'] < 1 or evaluation['min_steps_improvement'] < 0):
+                or not evaluation['tracks'] or track not in evaluation['tracks']
+                or len(set(evaluation['tracks'])) != len(evaluation['tracks'])
+                or evaluation['min_steps_improvement'] < 0):
             raise ValueError('Invalid evaluation settings')
-        if any(seed <= s < seed + iterations * trajectories for s in seeds):
+        if any(seed <= s < seed + initial_trajectories + (iterations - 1) * trajectories for s in seeds):
             raise ValueError('Evaluation seeds overlap collection seeds')
-    best, stale = None, 0
+    best = None
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
@@ -135,17 +138,20 @@ def run_dagger(config, *, learner=None, train_policy=None):
 
     paths = []
     total = 0
+    collected = 0
     env = STKRaceEnv(agent=AgentSpec(rank_start=0, use_ai=False),
                      track=track, num_kart=1, laps=1, step_size=step_size)
     try:
         with (output_dir / 'metrics.csv').open('x', newline='') as f:
             writer = None
             for iteration in range(1, iterations + 1):
-                beta = beta_decay ** (iteration - 1)
-                for episode in range(trajectories):
-                    episode_seed = seed + (iteration - 1) * trajectories + episode
+                beta = 1.0 if iteration == 1 else 0.0
+                episode_count = initial_trajectories if iteration == 1 else trajectories
+                for episode in range(episode_count):
+                    episode_seed = seed + collected
+                    collected += 1
                     path = output_dir / f'iteration_{iteration}' / f'episode_{episode + 1}.pkl.gz'
-                    print(f'Iteration {iteration}/{iterations}, episode {episode + 1}/{trajectories}, beta={beta:.3f}', flush=True)
+                    print(f'Iteration {iteration}/{iterations}, episode {episode + 1}/{episode_count}, beta={beta:.3f}', flush=True)
                     metrics = collect_episode(env, learner, beta=beta, seed=episode_seed,
                                               max_steps=max_steps, output=path, iteration=iteration,
                                               step_size=step_size)
@@ -166,25 +172,28 @@ def run_dagger(config, *, learner=None, train_policy=None):
                     train_policy(learner, tuple(paths), iteration)
 
                 if evaluation is not None:
-                    rows, summary = evaluate_policy(env, learner, seeds, max_steps, to_action)
-                    improved = is_improvement(summary, best, evaluation['min_steps_improvement'])
-                    append_metrics(output_dir / 'evaluation_episodes.csv',
-                                   [dict(iteration=iteration, **row) for row in rows])
-                    append_metrics(output_dir / 'evaluation.csv', [dict(
-                        iteration=iteration, training_steps=total, **summary, improved=improved)])
-                    print(f"Evaluation {iteration}: completion={summary['completion_rate']:.0%}, "
-                          f"steps={summary['steps_mean']:.2f}, finish steps={summary['finish_steps_mean']}", flush=True)
-                    if improved:
-                        best, stale = summary, 0
-                        shutil.copyfile(output_dir / f'actor_iteration_{iteration}.pt',
-                                        output_dir / 'actor_best.pt')
-                        with (output_dir / 'best_evaluation.json').open('w') as best_file:
-                            json.dump(dict(iteration=iteration, **summary), best_file, indent=2)
-                    else:
-                        stale += 1
-                    if stale >= evaluation['patience']:
-                        print(f'Early stopping: {stale} evaluations without improvement', flush=True)
-                        break
+                    try:
+                        for eval_track in evaluation['tracks']:
+                            env.default_track = eval_track
+                            rows, summary = evaluate_policy(env, learner, seeds, max_steps, to_action)
+                            selection_track = eval_track == track
+                            improved = selection_track and is_improvement(
+                                summary, best, evaluation['min_steps_improvement'])
+                            append_metrics(output_dir / 'evaluation_episodes.csv',
+                                [dict(iteration=iteration, track=eval_track, **row) for row in rows])
+                            append_metrics(output_dir / 'evaluation.csv', [dict(
+                                iteration=iteration, track=eval_track, training_steps=total,
+                                **summary, selection_track=selection_track, improved=improved)])
+                            print(f"Evaluation {iteration}, {eval_track}: completion={summary['completion_rate']:.0%}, "
+                                  f"steps={summary['steps_mean']:.2f}, finish steps={summary['finish_steps_mean']}", flush=True)
+                            if improved:
+                                best = summary
+                                shutil.copyfile(output_dir / f'actor_iteration_{iteration}.pt',
+                                                output_dir / 'actor_best.pt')
+                                with (output_dir / 'best_evaluation.json').open('w') as best_file:
+                                    json.dump(dict(iteration=iteration, track=eval_track, **summary), best_file, indent=2)
+                    finally:
+                        env.default_track = track
     finally:
         env.close()
     return paths

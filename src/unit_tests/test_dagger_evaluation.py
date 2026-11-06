@@ -22,6 +22,13 @@ class Learner:
 
 
 def test_evaluation():
+    created = []
+    def factory(env):
+        policy = Learner()
+        created.append(policy)
+        return policy
+    evaluate_policy(Env(), None, [1, 2, 3], 3, lambda x: x, policy_factory=factory)
+    assert len(created) == 3 and len({id(p) for p in created}) == 3
     rows, summary = evaluate_policy(Env(), Learner(), [1, 2, 3], 3, lambda x: x)
     assert [r['n_steps'] for r in rows] == [1, 3, 3]
     assert summary['completed'] == 2 and summary['timeouts'] == 1

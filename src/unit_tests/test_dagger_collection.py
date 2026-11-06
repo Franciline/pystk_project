@@ -44,7 +44,7 @@ def test_collection():
             assert metrics['expert_queries'] == 2
             assert metrics['expert_steps'] == 2 * beta
     try:
-        DAgger.run_dagger(dict(N=2, T=1, max_steps=2, beta_decay=0.5,
+        DAgger.run_dagger(dict(N=2, T=1, max_steps=2, initial_trajectories=1,
                                seed=0, track='abyss', step_size=0.1, output_dir='unused'))
     except ValueError:
         pass
