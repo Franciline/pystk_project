@@ -164,3 +164,22 @@ uv run src/main/plot_track_segments.py --experiment datasets/dagger
 ```
 
 One horizontal row per map, measured in meters, with vertical ticks separating segments. Reads `expert_benchmark/track_geometry/*_segments.csv`. Saves `plots/track_segments.png` and a zoomable `plots/track_segments.svg`. Optional `--output path/to/figure.png` overrides destination. Segments are concatenated in segment-ID order; branched tracks need not sum to official track length, which is also shown in the labels.
+
+## Watch expert/random mixtures
+
+From repository root, watch Team4 mixed with random actions in five-step policy blocks:
+
+```bash
+uv run src/main/single_track_race_display.py --track abyss --seed 10000 --epsilon 0.2 --hold-steps 5
+```
+
+Every five steps, choose random policy with probability 0.2, otherwise Team4. During random blocks, sample a new action each step; `rescue` always stays false. Change `--hold-steps` to 1 to choose the policy every step. No `--random-mode` argument is needed.
+
+```bash
+# Choose policy every step.
+uv run src/main/single_track_race_display.py --track abyss --seed 10000 --epsilon 0.2 --hold-steps 1
+# Hold random/expert policy selection for 5 steps; sample fresh random controls each step.
+uv run src/main/single_track_race_display.py --track abyss --seed 10000 --epsilon 0.2 --hold-steps 5
+```
+
+`--epsilon` defaults to 0 and `--hold-steps` to 1. Random actions are freshly sampled every step within random-policy blocks. At block boundaries, random is chosen with probability epsilon; consecutive random blocks are possible. Expert recomputes its suggestion every step, even during random blocks. Random rescue is always disabled. Mixing is unavailable with `--checkpoint`. Optional `--output` records executed actions and separate expert labels. No mode overlay or per-step prints are enabled; uncomment the action print in the runner if needed.
