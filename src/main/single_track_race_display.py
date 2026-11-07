@@ -2,6 +2,8 @@
 
 import argparse
 import json
+import random
+import numpy as np
 from copy import deepcopy
 import sys, os
 from pathlib import Path
@@ -25,7 +27,7 @@ AgentSpec.__hash__ = agent_spec_hash
 
 # Create agents specifications.
 agents_specs = [
-    AgentSpec(name=f"Team{4}", rank_start=0, use_ai=False, camera_mode=CameraMode.ON) # team$ only
+    AgentSpec(name=f"Team{3}", rank_start=0, use_ai=False, camera_mode=CameraMode.ON) # team$ only
 ]
 # agents_specs = [
 #     AgentSpec(name=f"Team{i+1}", rank_start=i, use_ai=False, camera_mode=CameraMode.ON) for i in range(MAX_TEAMS)
@@ -45,7 +47,18 @@ def create_race(policy=None, track="abyss", step_size=0.1):
     return env, agents, names
 
 
-def single_race(env, agents, names, output, seed=None, max_steps=MAX_STEPS, actor=False):
+def single_race(env, agents, names, output, seed=None, max_steps=MAX_STEPS, actor=False,
+                epsilon=0.0, hold_steps=1):
+    if not 0 <= epsilon <= 1 or hold_steps < 1:
+        raise ValueError("Require epsilon in [0, 1] and hold_steps >= 1")
+    if actor and epsilon > 0:
+        raise ValueError("Random mixing is unavailable with checkpoint")
+    if seed is not None:
+        random.seed(seed)
+        np.random.seed(seed)
+    env.action_space.seed(seed)
+    rng = np.random.default_rng(seed)
+    use_random = False
     obs, _ = env.reset(seed=seed)
     recorder = DatasetRecorder() if output is not None else None
     expert = Agent4(env, path_lookahead=3) if actor and recorder is not None else None
@@ -57,11 +70,23 @@ def single_race(env, agents, names, output, seed=None, max_steps=MAX_STEPS, acto
             "laps": 1,
             "max_steps": max_steps,
             "seed": seed,
+            "epsilon": epsilon, "hold_steps": hold_steps,
         })
     for step in range(max_steps):
         # Expert errors must not silently become demonstration labels.
         label = expert.choose_action(deepcopy(obs["0"])) if expert is not None else None
         action = agents[0].choose_action(obs["0"])
+        # Always query the expert above, including during random-policy blocks.
+        if not actor:
+            label = deepcopy(action)
+        if step % hold_steps == 0:
+            use_random = rng.random() < epsilon
+        if use_random:
+            sampled = env.action_space["0"].sample()
+            action = {key: np.asarray(value).item() for key, value in sampled.items()}
+            action["rescue"] = False
+        # Uncomment to inspect executed action values.
+        # print(f"Step {step}: {action}", flush=True)
         obs, _, terminated, truncated, info = env.step({"0": action})
         truncated = truncated or (step + 1 == max_steps and not terminated)
         if recorder is not None:
@@ -76,7 +101,12 @@ def single_race(env, agents, names, output, seed=None, max_steps=MAX_STEPS, acto
         recorder.save_episode(output)
         print(f"Saved {step + 1} steps to {output}")
 
-def main_loop(output, checkpoint=None, seed=None, device='auto', track=None):
+def main_loop(output, checkpoint=None, seed=None, device='auto', track=None,
+              epsilon=0.0, hold_steps=1):
+    if not 0 <= epsilon <= 1 or hold_steps < 1:
+        raise ValueError('Require epsilon in [0, 1] and hold_steps >= 1')
+    if checkpoint is not None and epsilon > 0:
+        raise ValueError('Random mixing is only supported with the Team4 expert')
     policy = None
     track_override = track
     track, step_size, max_steps = 'abyss', 0.1, MAX_STEPS
@@ -95,7 +125,8 @@ def main_loop(output, checkpoint=None, seed=None, device='auto', track=None):
     try:
         # print("Observation space:", env.observation_space)
         # print("Action space:", env.action_space)
-        single_race(env, agents, names, output, seed, max_steps, actor=checkpoint is not None)
+        single_race(env, agents, names, output, seed, max_steps, actor=checkpoint is not None,
+                    epsilon=epsilon, hold_steps=hold_steps)
     finally:
         env.close()
 
@@ -106,5 +137,7 @@ if __name__ == "__main__":
     parser.add_argument("--track", help="Override the experiment track, e.g. minigolf")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--device", choices=['auto', 'cpu', 'mps'], default='auto')
+    parser.add_argument("--epsilon", type=float, default=0.0, help="Random-policy probability per block")
+    parser.add_argument("--hold-steps", type=int, default=1, help="Steps per policy-selection block")
     args = parser.parse_args()
     main_loop(**vars(args))
