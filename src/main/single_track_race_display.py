@@ -56,7 +56,7 @@ def create_race(policy=None, track="abyss", step_size=0.1, team=4):
 
 
 def single_race(env, agents, names, output, seed=None, max_steps=MAX_STEPS, actor=False,
-                epsilon=0.0, hold_steps=1):
+                epsilon=0.0, hold_steps=1, delay=0):
     if not 0 <= epsilon <= 1 or hold_steps < 1:
         raise ValueError("Require epsilon in [0, 1] and hold_steps >= 1")
     if actor and epsilon > 0:
@@ -122,9 +122,7 @@ def load_rlpd(checkpoint, config):
     return policy
 
 
-def main_loop(output, checkpoint=None, seed=None, device='auto', track=None, delay=0, team=4):
-def main_loop(output, checkpoint=None, seed=None, device='auto', track=None,
-              epsilon=0.0, hold_steps=1):
+def main_loop(output, checkpoint=None, seed=None, device='auto', track=None, delay=0, team=4, epsilon=0.0, hold_steps=1):
     if not 0 <= epsilon <= 1 or hold_steps < 1:
         raise ValueError('Require epsilon in [0, 1] and hold_steps >= 1')
     if checkpoint is not None and epsilon > 0:
