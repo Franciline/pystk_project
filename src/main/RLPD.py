@@ -33,7 +33,7 @@ def sample(buffer, count, size, rng):
 
 # the rlpd loop: the agent drives (picks a slightly random action and the game moves on step)
 # record the transition into the online buffer
-# and learn with 10 training updates 
+# and learn with 3 training updates 
 
 def run_rlpd(config):
     seed, max_steps = config['seed'], config['max_steps']

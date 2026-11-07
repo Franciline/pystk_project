@@ -1,22 +1,27 @@
 # Collection iterations and trajectories per iteration.
-N: 5
-T: 2  # Learner episodes per later iteration.
-max_steps: 1000
-initial_trajectories: 1  # First iteration expert-only; later iterations learner-only.
-seed: 0        # Episode seeds increment across all iterations.
+N: 11   # train on starting data, then 10 x 5k online
 
-train_tracks: [abyss, minigolf, lighthouse, hacienda, zengarden]
-unseen_tracks: [snowtuxpeak]
+T: 1  # Learner episodes per later iteration, unused with steps_per_iteration TO REMOVE
+steps_per_iteration: 5000
+max_steps: 1000
+
+initial_dataset: datasets/d0_abyss_team4
+initial_trajectories: 1  # First iteration expert-only; later iterations learner-only, unused with initial_dataset TO REMOVE
+
+seed: 1000        # Episode seeds increment across all iterations.
+
+train_tracks: [abyss]
+unseen_tracks: []
 step_size: 0.1
-output_dir: datasets/dagger5seeds
+output_dir: datasets/protocol/dagger_seed1000
 
 actor:
-  num_paths: 20
+  num_paths: 182
   num_items: 10
   hidden_sizes: [256, 256]
   learning_rate: 0.001
-  batch_size: 128
-  epochs: 5
+  batch_size: 256
+  epochs: 10
   continuous_weight: 1.0
   boolean_weight: 1.0
   device: auto # or cpu
@@ -24,7 +29,7 @@ actor:
 # Validation seeds are fixed and separate from collection seeds.
 evaluation:
   seeds: [10000, 10001, 10002, 10003, 10004]  # Add seeds to measure variation.
-  min_relative_improvement: 0.01  # Absolute decrease in mean actor/expert step ratio.
+  min_relative_improvement: 0  # Absolute decrease in mean actor/expert step ratio.
 
 expert_benchmark:
   runs: 5  # Per training and unseen map, before training.

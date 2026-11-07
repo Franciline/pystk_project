@@ -1,17 +1,17 @@
 track: abyss
 step_size: 0.1
 max_steps: 1000 # timeout per episode
-seed: 0 # seeds of the network and all rng in training
-output_dir: datasets/rlpd_runs/seed0 # one fresh folder per run
+seed: 1000 # seeds of the network and all rng in training
+output_dir: datasets/protocol/rlpd_seed1000 # one fresh folder per run
 
 # encoder and eval same as dagger
 encoder:                 
-  num_paths: 100
+  num_paths: 182
   num_items: 10
 
 evaluation:              
   seeds: [10000, 10001, 10002, 10003, 10004]
-  min_steps_improvement: 1.0
+  min_steps_improvement: 0
 
 # offline expert data 
 offline:
@@ -19,19 +19,18 @@ offline:
   epsilons: [0.0, 0.1, 0.3]
 
 # actions
-learned_actions: [acceleration, steer, brake, drift, fire, nitro, rescue]  # others sent as 0
-# learned_actions: [acceleration, steer]   # for later 
+learned_actions: [acceleration, steer, brake, drift, fire, nitro]  # others sent as 0
 
 # online training
 total_env_steps: 50000   # online budget (approx 80 laps)
 eval_every: 5000         # env steps between evaluations
-online_seed_start: 100   # online episode seeds: 100, 101, ... (no overlap with offline 0-9 / eval 10000+)
+online_seed_start: 1000   # same as seed
 
 rlpd:
   hidden_sizes: [256, 256]
   batch_size: 256        # half offline, half online
   utd_ratio: 10          # gradient updates per env step (paper: 20, slower)
-  num_critics: 10        # critic ensemble size
+  num_critics: 5        # critic ensemble size
   num_min_critics: 2     # random subset used for the pessimistic min
   gamma: 0.99            # discount
   tau: 0.005             # target critic soft update
