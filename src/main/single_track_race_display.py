@@ -3,6 +3,7 @@
 import argparse
 import json
 from copy import deepcopy
+from importlib import import_module
 import sys, os
 import time
 from pathlib import Path
@@ -32,11 +33,17 @@ agents_specs = [
 #     AgentSpec(name=f"Team{i+1}", rank_start=i, use_ai=False, camera_mode=CameraMode.ON) for i in range(MAX_TEAMS)
 # ]
 
-def create_race(policy=None, track="abyss", step_size=0.1):
+def build_agent(team, env):
+    # import only the chosen team: team2 needs src/main as working folder
+    module = import_module(f"agents.team{team}.agent{team}")
+    return getattr(module, f"Agent{team}")(env, path_lookahead=3)
+
+
+def create_race(policy=None, track="abyss", step_size=0.1, team=4):
     # Create the multi-agent environment for N karts.
     env = STKRaceMultiEnv(agents=agents_specs, track=track, render_mode="human", num_kart=MAX_TEAMS, laps=1, step_size=step_size)
 
-    agents = [policy if policy is not None else Agent4(env, path_lookahead=3)]
+    agents = [policy if policy is not None else build_agent(team, env)]
     names = []
 
     for i in range(MAX_TEAMS):
@@ -90,7 +97,7 @@ def load_rlpd(checkpoint, config):
     return policy
 
 
-def main_loop(output, checkpoint=None, seed=None, device='auto', track=None, delay=0):
+def main_loop(output, checkpoint=None, seed=None, device='auto', track=None, delay=0, team=4):
     policy = None
     track_override = track
     track, step_size, max_steps = 'abyss', 0.1, MAX_STEPS
@@ -107,8 +114,8 @@ def main_loop(output, checkpoint=None, seed=None, device='auto', track=None, del
             step_size, max_steps = config['step_size'], config['max_steps']
     if track_override is not None:
         track = track_override
-    print(f'Policy={checkpoint or "Team4"}; track={track}, max_steps={max_steps}')
-    env, agents, names = create_race(policy, track, step_size)
+    print(f'Policy={checkpoint or f"Team{team}"}; track={track}, max_steps={max_steps}')
+    env, agents, names = create_race(policy, track, step_size, team)
     try:
         # print("Observation space:", env.observation_space)
         # print("Action space:", env.action_space)
@@ -124,5 +131,6 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--device", choices=['auto', 'cpu', 'mps'], default='auto')
     parser.add_argument("--delay", type=float, default=0, help="Seconds to pause per step; 0.1 is about real speed")
+    parser.add_argument("--team", type=int, choices=range(1, 6), default=4, help="Team to drive when no checkpoint is given")
     args = parser.parse_args()
     main_loop(**vars(args))
