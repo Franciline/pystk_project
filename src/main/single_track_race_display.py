@@ -29,7 +29,7 @@ AgentSpec.__hash__ = agent_spec_hash
 
 # Create agents specifications.
 agents_specs = [
-    AgentSpec(name=f"Team{3}", rank_start=0, use_ai=False, camera_mode=CameraMode.ON) # team$ only
+    AgentSpec(name=f"Team{4}", rank_start=0, use_ai=False, camera_mode=CameraMode.ON) # team$ only
 ]
 # agents_specs = [
 #     AgentSpec(name=f"Team{i+1}", rank_start=i, use_ai=False, camera_mode=CameraMode.ON) for i in range(MAX_TEAMS)
