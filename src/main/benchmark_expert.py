@@ -18,11 +18,12 @@ def run_benchmark(config, output_dir, seeds):
     output_dir.mkdir(parents=True, exist_ok=True)
     with (output_dir / 'config.json').open('x') as file:
         json.dump(dict(task_config=config, seeds=seeds, expert='team4'), file, indent=2)
+    tracks = [config['track']] if 'track' in config else config['train_tracks'] + config['unseen_tracks']
     env = STKRaceEnv(agent=AgentSpec(rank_start=0, use_ai=False),
-                     track=config['train_tracks'][0], num_kart=1, laps=1, step_size=config['step_size'])
+                     track=tracks[0], num_kart=1, laps=1, step_size=config['step_size'])
     try:
         summaries = {}
-        for track in config['train_tracks'] + config['unseen_tracks']:
+        for track in tracks:
             env.default_track = track
             rows, summary = evaluate_policy(
                 env, None, seeds, config['max_steps'], to_action,

@@ -67,6 +67,7 @@ class ActorPolicy:
         return {
             'acceleration': float(outputs[0]), 'steer': float(outputs[1]),
             **{key: bool(outputs[i + 2] > 0) for i, key in enumerate(BUTTONS)},
+            'rescue': False,  # Keep seven NN outputs; never execute manual rescue.
         }
 
     @classmethod

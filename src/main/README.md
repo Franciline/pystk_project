@@ -4,40 +4,50 @@ Commands below start from the repository root (`pystk_project/`), with dependenc
 
 ## DAgger training — `DAgger.py`
 
-Collect expert/learner episodes, aggregate expert labels, train the actor, and evaluate the learner alone after each iteration. Runs headless, with Team4 as expert and one kart doing one lap.
+One kart, one lap, one map. Iteration 1 initializes the dataset and trains the actor; later iterations collect whole episodes until at least `steps_per_iteration` new steps, aggregate, train, and evaluate. The last episode can overshoot the budget. Actor has seven outputs; rescue is always forced false when executed. Expert labels are recorded every step, including during random exploration.
 
 ```bash
 uv run src/main/DAgger.py
-uv run src/main/DAgger.py --config src/main/dagger_config.yaml
+uv run src/main/DAgger.py --config src/main/dagger_config.yaml seed=2000 online_seed_start=2000 output_dir=datasets/protocol/dagger_seed2000
 ```
 
-Only CLI option: `--config`, the YAML configuration path. Defaults to `dagger_config.yaml` beside the script. Change experiment settings in YAML:
+`key=value` overrides YAML for one invocation, including nested settings such as `actor.epochs=5`.
+
+```bash
+for s in 1000 2000 3000; do
+  caffeinate -i ../.venv/bin/python src/main/DAgger.py seed=$s online_seed_start=$s output_dir=datasets/protocol/dagger_seed$s
+done
+```
+
+The Python path above assumes the environment is in the parent directory; use your environment's Python path if different.
 
 | Parameter | Meaning |
 |---|---|
-| `N` | Maximum DAgger iterations: collect, train, evaluate |
-| `T` | Learner-driven episodes per training map per later iteration |
-| `initial_trajectories` | Expert-driven episodes per training map in iteration 1 |
-| `max_steps` | Step limit per collection/evaluation episode |
-| `seed` | Base collection seed; increments each episode; also seeds actor initialization |
-| `train_tracks` | Explicit list of training maps; one shared actor learns from all |
-| `unseen_tracks` | Diagnostic evaluation maps, excluded from training and checkpoint selection |
-| `step_size` | Simulation step duration in seconds |
-| `output_dir` | Experiment directory; relative paths resolve from repository root. Use a fresh directory per experiment. |
-| `actor.num_paths`, `actor.num_items` | Number of path/item slots passed to NN; raw saved observations stay complete |
-| `actor.hidden_sizes` | MLP hidden-layer widths, e.g. `[256, 256]` |
-| `actor.learning_rate` | Adam learning rate |
-| `actor.batch_size` | Training examples per gradient update |
-| `actor.epochs` | Full passes through aggregated training data per iteration |
-| `actor.continuous_weight`, `actor.boolean_weight` | Weights for continuous MSE and Boolean BCE losses |
-| `actor.device` | `auto`: MPS when available, otherwise CPU; `cpu`: force CPU |
-| `expert_benchmark.runs`, `expert_benchmark.seed_start` | Expert baseline episodes per map and first seed; benchmark runs automatically before training |
-| `evaluation.seeds` | Fixed validation seeds, separate from all collection seeds |
-| `evaluation.min_relative_improvement` | Minimum decrease in equal-map mean actor/expert finishing-step ratio at tied completion |
+| `N` | Total rounds including initialization/training round 1; default 11 |
+| `steps_per_iteration` | Minimum new steps in rounds 2…N; default 5000 |
+| `max_steps` | Timeout per collection/evaluation episode; default 1000 |
+| `track`, `step_size` | Fixed map and simulation duration per step |
+| `seed` | Network initialization and training shuffle seed |
+| `online_seed_start` | First collection episode seed; increments each episode |
+| `online_epsilon` | One fixed random-action replacement probability for learner collection; default 0.1 |
+| `initialization.mode` | `generate_offline`, `single_expert`, or `load_offline` |
+| `initialization.epsilons` | Expert/random replacement probabilities for initialization; `[0.0, 0.1, 0.3]` |
+| `initialization.episodes_per_epsilon` | Default 3: nine initialization episodes; duplicates retained |
+| `initialization.dataset` | Source folder for trusted offline episodes when loading; existing expert labels used, missing labels reconstructed sequentially with Team4 |
+| `actor.num_paths`, `actor.num_items` | Encoder limits; 182 paths and 10 items |
+| `actor.hidden_sizes` | MLP widths; `[256, 256]` |
+| `actor.learning_rate`, `actor.batch_size` | Adam learning rate and examples per update |
+| `actor.epochs` | Fixed passes over all aggregate data per round; default 5 |
+| `actor.continuous_weight`, `actor.boolean_weight` | MSE/BCE weights |
+| `actor.device` | `auto` prefers MPS, otherwise CPU; `cpu` forces CPU |
+| `evaluation.seeds` | Fixed evaluation seeds; defaults 10000–10004 |
+| `evaluation.min_steps_improvement` | Minimum decrease in successful finishing steps at tied completion |
+| `expert_benchmark.runs`, `expert_benchmark.seed_start` | Expert baseline settings; set `expert_benchmark: null` to skip |
+| `output_dir` | Fresh experiment directory, relative to repository root |
 
-Saves episodes under `iteration_*/`, `episodes.json`, `config.json`, collection `metrics.csv`, `losses.csv`, `normalizer.npz`, and `actor_iteration_*.pt`. Evaluation writes `evaluation_episodes.csv`, `evaluation.csv`, `best_evaluation.json`, and `actor_best.pt`.
+`single_expert` collects one clean episode. `generate_offline` samples fresh whole random actions with the selected epsilon each step. Later rounds use only `online_epsilon`, not the initialization epsilon list. Rescue is disabled for all executed actions, expert labels, and evaluation. Raw seven-output architecture is preserved. Normalization fits initialization data once and freezes; minibatches sample uniformly over aggregated transitions.
 
-Best model: equally weighted mean completion rate across training maps first, then lower equally weighted mean actor/expert finishing-step ratio. Speed comparison requires identical completed (map, seed) cases and a defined ratio on every training map. Only one overall actor_best.pt is selected. All N iterations run, each training for actor.epochs; there is no early stopping. Evaluation CSVs include track identifiers. Evaluation reports steps for all episodes and successful episodes separately, with sample standard deviations. Evaluation episodes never enter training. Existing experiment configuration is not overwritten; resume is not implemented.
+Outputs: `iteration_*/episode_*.pkl.gz`, `episodes.json`, `config.json`, `metrics.csv`, `losses.csv`, `normalizer.npz`, `evaluation_episodes.csv`, `evaluation.csv`, `best_evaluation.json`, and checkpoints `actor_iteration_*.pt`, `actor_best.pt`, `actor_last.pt`. Best model prioritizes completion then mean successful finishing steps. All N rounds run. Initialization and online steps are recorded separately; evaluation and expert benchmark steps are not charged to online collection. Reused offline historical actions remain unchanged; their expert labels have rescue disabled. Existing experiment output is not resumed or overwritten.
 
 ## One displayed demonstration — `single_track_race_display.py`
 
@@ -119,7 +129,7 @@ Loads network weights and normalization from the checkpoint. Reads the first tra
 
 ## Expert performance baseline — `benchmark_expert.py`
 
-Run Team4 alone on all `train_tracks` and `unseen_tracks` maps, with a fresh expert per episode. Task settings (`max_steps`, `step_size`, one kart, one lap) match DAgger. Episodes are evaluated only and never added to training.
+Run Team4 alone on the configured `track`, with a fresh expert per episode. Older multi-track configurations are also supported. Task settings (`max_steps`, `step_size`, one kart, one lap) match DAgger. Episodes are evaluated only and never added to training.
 
 ```bash
 uv run src/main/benchmark_expert.py --runs 5
@@ -135,16 +145,6 @@ Override the display track with `--track minigolf`, including when loading a che
 ```bash
 uv run src/main/single_track_race_display.py --checkpoint datasets/dagger/actor_best.pt --track minigolf --seed 10000
 ```
-
-## Multi-track experiment outputs
-
-Collection episodes use `iteration_<i>/<track>/episode_<n>.pkl.gz`. All contribute to one shared actor; minibatches sample uniformly over transitions, so longer episodes contribute more examples. Normalization fits all initial training-map episodes and then freezes.
-
-The automatic baseline is saved under the experiment's `expert_benchmark/` directory (`episodes.csv`, `summary.csv`, `config.json`). It runs on both training and unseen maps. Training stops with an explanatory error if the expert never finishes a training map: a reference finishing-step ratio cannot be defined.
-
-`evaluation.csv` reports per-map results including `relative_finish_steps` (actor mean finishing steps / expert mean finishing steps). `evaluation_aggregate.csv` reports training-map completion and relative speed used for checkpoint selection. Unseen maps never affect selection.
-
-The baseline also saves `track_geometry/<track>.json` with official track length and segment statistics, plus `<track>_segments.csv` with each world-space segment's length in meters. Segment sums can differ from official length on branched tracks. With `num_paths: 20`, the count is fixed but physical lookahead varies with segment lengths.
 
 ## Plot DAgger results — `plot_dagger.py`
 

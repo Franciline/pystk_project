@@ -43,13 +43,6 @@ def test_collection():
             assert ep['truncated'] == [False, True]
             assert metrics['expert_queries'] == 2
             assert metrics['expert_steps'] == 2 * beta
-    try:
-        DAgger.run_dagger(dict(N=2, T=1, max_steps=2, initial_trajectories=1,
-                               seed=0, train_tracks=['abyss'], unseen_tracks=[], step_size=0.1, output_dir='unused'))
-    except ValueError:
-        pass
-    else:
-        raise AssertionError('Missing learner accepted')
 
 
 if __name__ == '__main__':

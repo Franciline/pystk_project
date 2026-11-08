@@ -1,19 +1,19 @@
-# Collection iterations and trajectories per iteration.
-N: 11   # train on starting data, then 10 x 5k online
-
-T: 1  # Learner episodes per later iteration, unused with steps_per_iteration TO REMOVE
-steps_per_iteration: 5000
+# Iteration 1: initialization, then N-1 step-budget collection/training rounds.
+N: 11
+steps_per_iteration: 5000  # Minimum online steps; finish/time out the final episode.
 max_steps: 1000
-
-initial_dataset: datasets/d0_abyss_team4
-initial_trajectories: 1  # First iteration expert-only; later iterations learner-only, unused with initial_dataset TO REMOVE
-
-seed: 1000        # Episode seeds increment across all iterations.
-
-train_tracks: [abyss]
-unseen_tracks: []
+track: abyss
 step_size: 0.1
+seed: 1000
+online_seed_start: 1000
+online_epsilon: 0.1  # Fixed random-action replacement probability after initialization.
 output_dir: datasets/protocol/dagger_seed1000
+
+initialization:
+  mode: generate_offline  # generate_offline, single_expert, load_offline
+  epsilons: [0.0, 0.1, 0.3]
+  episodes_per_epsilon: 3  # Nine episodes total; duplicates retained.
+  dataset: datasets/d0_abyss_team4  # Only used by load_offline.
 
 actor:
   num_paths: 182
@@ -21,16 +21,15 @@ actor:
   hidden_sizes: [256, 256]
   learning_rate: 0.001
   batch_size: 256
-  epochs: 10
+  epochs: 5
   continuous_weight: 1.0
   boolean_weight: 1.0
-  device: auto # or cpu
+  device: auto
 
-# Validation seeds are fixed and separate from collection seeds.
 evaluation:
-  seeds: [10000, 10001, 10002, 10003, 10004]  # Add seeds to measure variation.
-  min_relative_improvement: 0  # Absolute decrease in mean actor/expert step ratio.
+  seeds: [10000, 10001, 10002, 10003, 10004]
+  min_steps_improvement: 0
 
 expert_benchmark:
-  runs: 5  # Per training and unseen map, before training.
+  runs: 5
   seed_start: 10000

@@ -32,3 +32,6 @@ datasets/*/*/*.npz
 *.pt
 *.npz
 *.pkl.gz
+datasets/dagger+/
+datasets/dagger*/
+datasets/expert_benchmark/
