@@ -1,0 +1,59 @@
+{
+  "task_config": {
+    "N": 11,
+    "steps_per_iteration": 5000,
+    "max_steps": 1000,
+    "track": "abyss",
+    "step_size": 0.1,
+    "seed": 3000,
+    "online_seed_start": 3000,
+    "online_epsilon": 0.1,
+    "output_dir": "datasets/protocol/dagger_offline_seed3000",
+    "initialization": {
+      "mode": "load_offline",
+      "epsilons": [
+        0.0,
+        0.1,
+        0.3
+      ],
+      "episodes_per_epsilon": 3,
+      "dataset": "datasets/rlpd_offline_data/abyss"
+    },
+    "actor": {
+      "num_paths": 182,
+      "num_items": 10,
+      "hidden_sizes": [
+        256,
+        256
+      ],
+      "learning_rate": 0.001,
+      "batch_size": 256,
+      "epochs": 5,
+      "continuous_weight": 1.0,
+      "boolean_weight": 1.0,
+      "device": "auto"
+    },
+    "evaluation": {
+      "seeds": [
+        10000,
+        10001,
+        10002,
+        10003,
+        10004
+      ],
+      "min_steps_improvement": 0
+    },
+    "expert_benchmark": {
+      "runs": 5,
+      "seed_start": 10000
+    }
+  },
+  "seeds": [
+    10000,
+    10001,
+    10002,
+    10003,
+    10004
+  ],
+  "expert": "team4"
+}

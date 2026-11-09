@@ -183,3 +183,13 @@ uv run src/main/single_track_race_display.py --track abyss --seed 10000 --epsilo
 ```
 
 `--epsilon` defaults to 0 and `--hold-steps` to 1. Random actions are freshly sampled every step within random-policy blocks. At block boundaries, random is chosen with probability epsilon; consecutive random blocks are possible. Expert recomputes its suggestion every step, even during random blocks. Random rescue is always disabled. Mixing is unavailable with `--checkpoint`. Optional `--output` records executed actions and separate expert labels. No mode overlay or per-step prints are enabled; uncomment the action print in the runner if needed.
+
+## Compare DAgger initializations: relative finishing steps
+
+```bash
+uv run src/main/plot_dagger.py --compare-protocol datasets/protocol --seeds 1000 2000 3000
+```
+
+Reads all `dagger_seed*` and `dagger_offline_seed*` evaluation logs and their expert benchmark summaries. One curve per initialization averages actor/expert finishing-step ratios across training seeds; bands show ±1 sample standard deviation across those seeds (not across evaluation laps). Expert mean is treated as a fixed reference; 1 means expert speed, below 1 faster, above 1 slower. X-axis excludes initial data and measures new online collection steps. Runs are aligned every 5000 steps using their latest available evaluation and limited to their common budget. Successful laps only; completion means are included in the accompanying CSV. This compares online sample use, not equal total initial-data budgets.
+
+Saves `datasets/protocol/plots/relative_steps_comparison.png`, `.svg`, and `.csv`. Optional `--output-dir` changes the destination. Existing per-experiment plotting commands still work.

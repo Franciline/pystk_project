@@ -1,5 +1,6 @@
 """Plot DAgger CSV logs, including per-map expert baselines."""
 import argparse
+import json
 from pathlib import Path
 
 import matplotlib
@@ -107,9 +108,83 @@ def plot_results(experiment, output_dir=None):
     return saved
 
 
+def plot_relative_comparison(protocol, seeds, output_dir=None):
+    """Compare seed means on a shared online-step grid; carry latest eval forward.
+
+    Bands are sample std across training seeds, not across evaluation episodes.
+    Each run uses its own saved expert mean as a fixed denominator.
+    """
+    protocol = Path(protocol)
+    output = Path(output_dir) if output_dir is not None else protocol / 'plots'
+    output.mkdir(parents=True, exist_ok=True)
+    methods = {'dagger': 'DAgger — generated initialization',
+               'dagger_offline': 'DAgger — loaded offline initialization'}
+    runs = {}
+    task = None
+    for method in methods:
+        runs[method] = []
+        for seed in seeds:
+            folder = protocol / f'{method}_seed{seed}'
+            config = json.loads((folder / 'config.json').read_text())
+            current = (config['track'], config['max_steps'], config['step_size'],
+                       tuple(config['evaluation']['seeds']))
+            if task is not None and current != task:
+                raise ValueError('Comparison requires matching task and evaluation conditions')
+            task = current
+            rows = pd.read_csv(folder / 'evaluation.csv').sort_values('online_steps')
+            expert = pd.read_csv(folder / 'expert_benchmark' / 'summary.csv')
+            reference = float(expert.loc[expert['track'] == config['track'], 'finish_steps_mean'].iloc[0])
+            if not np.isfinite(reference) or reference <= 0:
+                raise ValueError(f'No successful expert baseline: {folder}')
+            rows['ratio'] = rows['finish_steps_mean'] / reference
+            runs[method].append(rows)
+    end = min(float(r['online_steps'].max()) for rows in runs.values() for r in rows)
+    grid = np.unique(np.r_[np.arange(0, end + 1, 5000), end])
+    fig, ax = plt.subplots(figsize=(9, 5))
+    summaries = []
+    for method, label in methods.items():
+        values, completion = [], []
+        for rows in runs[method]:
+            indices = np.searchsorted(rows['online_steps'].to_numpy(), grid, side='right') - 1
+            if np.any(indices < 0):
+                raise ValueError('Each run needs an initialization evaluation at zero online steps')
+            values.append(rows['ratio'].to_numpy()[indices])
+            completion.append(rows['completion_rate'].to_numpy()[indices])
+        values = np.stack(values)
+        mean = values.mean(axis=0)
+        std = values.std(axis=0, ddof=1) if len(seeds) > 1 else np.full(len(grid), np.nan)
+        line, = ax.plot(grid, mean, marker='o', label=f'{label} (n={len(seeds)})')
+        ax.fill_between(grid, mean - std, mean + std, color=line.get_color(), alpha=.18)
+        for i, step in enumerate(grid):
+            summaries.append(dict(method=method, online_steps=step, ratio_mean=mean[i],
+                                  ratio_std=std[i], completion_rate_mean=np.mean(completion, axis=0)[i]))
+    ax.axhline(1, color='black', linestyle='--', linewidth=1.3, label='Expert = 1')
+    ax.set(xlabel='Online collection steps (initial data excluded)',
+           ylabel='Actor / expert mean finishing steps',
+           title=f'Relative finishing steps — {task[0]} (lower is faster)')
+    ax.grid(alpha=.2)
+    ax.legend()
+    fig.text(.5, .015, 'Bands: ±1 sample std across training seeds. Latest evaluation carried forward. Successful laps only.',
+             ha='center', fontsize=9)
+    fig.tight_layout(rect=(0, .05, 1, 1))
+    path = output / 'relative_steps_comparison.png'
+    fig.savefig(path, dpi=180, bbox_inches='tight')
+    fig.savefig(path.with_suffix('.svg'), bbox_inches='tight')
+    plt.close(fig)
+    pd.DataFrame(summaries).to_csv(output / 'relative_steps_comparison.csv', index=False)
+    print(path)
+    return path
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--experiment', type=Path, required=True, help='Directory containing evaluation.csv and losses.csv')
-    parser.add_argument('--output-dir', type=Path, help='Default: <experiment>/plots')
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument('--experiment', type=Path, help='Directory containing evaluation.csv and losses.csv')
+    mode.add_argument('--compare-protocol', type=Path, help='Compare dagger_seed* and dagger_offline_seed* runs')
+    parser.add_argument('--seeds', type=int, nargs='+', default=[1000, 2000, 3000])
+    parser.add_argument('--output-dir', type=Path)
     args = parser.parse_args()
-    plot_results(args.experiment, args.output_dir)
+    if args.compare_protocol is not None:
+        plot_relative_comparison(args.compare_protocol, args.seeds, args.output_dir)
+    else:
+        plot_results(args.experiment, args.output_dir)
