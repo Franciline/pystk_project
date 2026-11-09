@@ -193,3 +193,24 @@ uv run src/main/plot_dagger.py --compare-protocol datasets/protocol --seeds 1000
 Reads all `dagger_seed*` and `dagger_offline_seed*` evaluation logs and their expert benchmark summaries. One curve per initialization averages actor/expert finishing-step ratios across training seeds; bands show ±1 sample standard deviation across those seeds (not across evaluation laps). Expert mean is treated as a fixed reference; 1 means expert speed, below 1 faster, above 1 slower. X-axis excludes initial data and measures new online collection steps. Runs are aligned every 5000 steps using their latest available evaluation and limited to their common budget. Successful laps only; completion means are included in the accompanying CSV. This compares online sample use, not equal total initial-data budgets.
 
 Saves `datasets/protocol/plots/relative_steps_comparison.png`, `.svg`, and `.csv`. Optional `--output-dir` changes the destination. Existing per-experiment plotting commands still work.
+
+## Gaussian or random exploration during DAgger collection
+
+Learner collection (iterations 2…N) now uses the YAML `exploration` settings:
+
+```yaml
+exploration:
+  mode: gaussian
+  probability: 1.0
+  acceleration_std: 0.05
+  steer_std: 0.1
+```
+
+Gaussian noise is added independently to acceleration and steering, clipped to their valid ranges. Boolean predictions stay unchanged, with rescue always false. `probability` gates Gaussian perturbations per step; `online_epsilon` is used only in random mode. Initialization still uses its original expert/random epsilon mixtures; loaded initial data is unchanged. Evaluation has no exploration. Saved expert labels remain unperturbed; episode metadata and `noise_steps`/`random_steps` identify exploration.
+
+```bash
+# Gaussian noise; choose a fresh output folder.
+uv run src/main/DAgger.py exploration.mode=gaussian exploration.acceleration_std=0.05 exploration.steer_std=0.1 output_dir=datasets/protocol/dagger_gaussian_seed1000
+# Original epsilon whole-action replacement remains available.
+uv run src/main/DAgger.py exploration.mode=random online_epsilon=0.1 output_dir=datasets/protocol/dagger_random_seed1000
+```

@@ -6,7 +6,13 @@ track: abyss
 step_size: 0.1
 seed: 1000
 online_seed_start: 1000
-online_epsilon: 0.1  # Fixed random-action replacement probability after initialization.
+online_epsilon: 0.1  # Used only when exploration.mode=random.
+# Learner collection only; initialization retains its epsilon random-action mixture.
+exploration:
+  mode: gaussian  # gaussian or random
+  probability: 1.0  # Gaussian perturbation probability per step.
+  acceleration_std: 0.05
+  steer_std: 0.1
 output_dir: datasets/protocol/dagger_seed1000
 
 initialization:

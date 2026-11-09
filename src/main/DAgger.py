@@ -42,12 +42,20 @@ def to_action(action):
     return result
 
 
-def collect_episode(env, learner, *, beta, seed, max_steps, output, iteration, step_size, epsilon=0.0):
+def collect_episode(env, learner, *, beta, seed, max_steps, output, iteration, step_size, epsilon=0.0,
+                    exploration_mode='random', acceleration_std=0.05, steer_std=0.1,
+                    gaussian_probability=1.0):
     """Query expert at every visited state; select which policy controls each step."""
     if not 0 <= beta <= 1 or max_steps < 1:
         raise ValueError('Require beta in [0, 1] and max_steps >= 1')
     if beta < 1 and learner is None:
         raise ValueError('A learner policy is required when beta < 1')
+    if exploration_mode not in ('random', 'gaussian'):
+        raise ValueError('exploration_mode must be random or gaussian')
+    if (not 0 <= epsilon <= 1 or not 0 <= gaussian_probability <= 1
+            or not np.isfinite([acceleration_std, steer_std]).all()
+            or min(acceleration_std, steer_std) < 0):
+        raise ValueError('Invalid exploration probability or standard deviation')
     random.seed(seed)
     np.random.seed(seed)
 
@@ -65,10 +73,13 @@ def collect_episode(env, learner, *, beta, seed, max_steps, output, iteration, s
         'agent': 'team4', 'track': env.current_track, 'seed': seed,
         'iteration': iteration, 'beta': beta, 'epsilon': epsilon, 'max_steps': max_steps,
         'step_size': step_size, 'laps': 1, 'num_kart': 1,
+        'exploration_mode': exploration_mode, 'acceleration_std': acceleration_std,
+        'steer_std': steer_std, 'gaussian_probability': gaussian_probability,
     })
 
     expert_steps = 0
     random_steps = 0
+    noise_steps = 0
 
     for step in range(max_steps):
         # Isolate mutable helper policies from each other and recorded inputs.
@@ -76,11 +87,21 @@ def collect_episode(env, learner, *, beta, seed, max_steps, output, iteration, s
 
         use_expert = rng.random() < beta
         action = label if use_expert else to_action(learner.choose_action(deepcopy(obs)))
-        use_random = rng.random() < epsilon
-        if use_random:
-            action = to_action(env.action_space.sample())
-        expert_steps += int(use_expert and not use_random)
-        random_steps += int(use_random)
+        explore = rng.random() < (epsilon if exploration_mode == 'random' else gaussian_probability)
+        # Copy before perturbing: expert label must remain the unperturbed recommendation.
+        action = deepcopy(action)
+        if explore:
+            if exploration_mode == 'random':
+                action = to_action(env.action_space.sample())
+                random_steps += 1
+            else:
+                action['acceleration'] = float(np.clip(
+                    action['acceleration'] + rng.normal(0, acceleration_std), 0, 1))
+                action['steer'] = float(np.clip(
+                    action['steer'] + rng.normal(0, steer_std), -1, 1))
+                noise_steps += 1
+        action['rescue'] = False
+        expert_steps += int(use_expert and not explore)
 
         next_obs, reward, terminated, truncated, _ = env.step(deepcopy(action))
         truncated = bool(truncated or (step + 1 == max_steps and not terminated))
@@ -96,7 +117,8 @@ def collect_episode(env, learner, *, beta, seed, max_steps, output, iteration, s
         'iteration': iteration, 'seed': seed, 'beta': beta, 'epsilon': epsilon,
         'n_steps': step + 1, 'completed_laps': int(terminated),
         'truncated': bool(truncated), 'expert_queries': step + 1,
-        'expert_steps': expert_steps, 'random_steps': random_steps,
+        'expert_steps': expert_steps, 'random_steps': random_steps, 'noise_steps': noise_steps,
+        'exploration_mode': exploration_mode,
         'lap_time': (step + 1) * step_size if terminated else None,
     }
     recorder.episode['metadata'].update(metrics)
@@ -185,9 +207,14 @@ def run_dagger(config, *, learner=None, train_policy=None):
                     path = output_dir / f'iteration_{iteration}' / f'episode_{episode}.pkl.gz'
                     print(f'Iteration {iteration}/{config["N"]}, episode {episode}, '
                           f'epsilon={epsilon}, round steps={round_steps}', flush=True)
+                    exploration = config.get('exploration', {}) if iteration > 1 else {}
                     metrics = collect_episode(env, learner, beta=1.0 if iteration == 1 else 0.0,
                         seed=episode_seed, max_steps=max_steps, output=path,
-                        iteration=iteration, step_size=config['step_size'], epsilon=epsilon)
+                        iteration=iteration, step_size=config['step_size'], epsilon=epsilon,
+                        exploration_mode=exploration.get('mode', 'random'),
+                        acceleration_std=exploration.get('acceleration_std', 0.05),
+                        steer_std=exploration.get('steer_std', 0.1),
+                        gaussian_probability=exploration.get('probability', 1.0))
                     paths.append(path)
                     round_steps += metrics['n_steps']
                     if iteration == 1:
