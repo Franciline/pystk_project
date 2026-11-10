@@ -21,7 +21,8 @@ from utils.observation_encoder import ObservationEncoder
 from utils.observation_normalizer import ObservationNormalizer
 from utils.rlpd_dataset import load_episodes, drop_duplicates, build_offline_buffer
 from utils.dataset_recorder import DatasetRecorder
-from utils.multitrack import train_tracks, next_track, evaluate_tracks
+from utils.multitrack import (train_tracks,next_track,evaluate_tracks,track_step_limit,
+    prepare_config,save_expert_reference,MapCollection,report_collection)
 
 CONFIG_PATH = Path(__file__).with_name('rlpd_config.yaml')
 FIELDS = ('obs', 'action', 'reward', 'next_obs', 'terminated')
@@ -38,7 +39,8 @@ def sample(buffer, count, size, rng):
 # and learn with 3 training updates 
 
 def run_rlpd(config):
-    seed, max_steps = config['seed'], config['max_steps']
+    config=prepare_config(config)
+    seed=config['seed']
     cfg = config['rlpd']
     random.seed(seed)
     np.random.seed(seed)
@@ -78,7 +80,7 @@ def run_rlpd(config):
 
     # --- online buffer, preallocated (one extra episode of room for the last overshoot) ---
     # ponytail: stores obs and next_obs separately (~0.8 GB at 50k steps); fine on one Mac.
-    capacity = config['total_env_steps'] + max_steps
+    capacity = config['total_env_steps'] + max(track_step_limit(config,t) for t in tracks)
     action_size = len(agent.learned)
     online = {'obs': np.zeros((capacity, encoder.output_size), np.float32),
               'action': np.zeros((capacity, action_size), np.float32),
@@ -97,25 +99,24 @@ def run_rlpd(config):
     def encode(raw_obs):
         return normalizer.transform(encoder.encode(raw_obs))
 
-    if config.get('expert_benchmark'):
-        from main.benchmark_expert import run_benchmark
-        benchmark=config['expert_benchmark']
-        run_benchmark(config,output_dir/'expert_benchmark',
-                      list(range(benchmark['seed_start'],benchmark['seed_start']+benchmark['runs'])))
+    save_expert_reference(config,output_dir)
     env = STKRaceEnv(agent=AgentSpec(rank_start=0, use_ai=False), track=tracks[0],
                      num_kart=1, laps=1, step_size=config['step_size'])
     env_step, episode, next_eval, best = 0, 0, config['eval_every'], None
-    map_steps = {track:0 for track in tracks}
+    collection=MapCollection(tracks,config["online_seed_start"])
+    interval_steps={track:0 for track in tracks}
+    interval_episodes={track:0 for track in tracks}
     start = time.time()
     try:
         while env_step < config['total_env_steps']:
-            episode_seed = config['online_seed_start'] + episode
-            track = next_track(tracks,map_steps)
+            track = next_track(tracks,collection.steps)
+            episode_seed=collection.next_seed(track)
+            max_steps=track_step_limit(config,track)
             env.default_track = track
             raw_obs = env.reset(seed=episode_seed)[0]
             recorder = DatasetRecorder(env,config.get('diagnostics'),expert_labels=False)
             recorder.start_episode(raw_obs,metadata=dict(track=track,seed=episode_seed,
-                agent='rlpd',step_size=config['step_size'],laps=1,num_kart=1,role='online_training'))
+                agent='rlpd',step_size=config['step_size'],max_steps=max_steps,laps=1,num_kart=1,role='online_training'))
             obs = encode(raw_obs)
             episode_return, logs = 0.0, dict(critic_loss=None,actor_loss=None,
                 temperature=float(agent.log_alpha.exp().item()))
@@ -136,7 +137,9 @@ def run_rlpd(config):
                 if terminated or truncated:
                     break
 
-            map_steps[track] += step+1
+            collection.record(track,step+1)
+            interval_steps[track]+=step+1
+            interval_episodes[track]+=1
             diagnostic_summary = recorder.diagnostics.summary() if recorder.diagnostics else {}
             recorder.save_episode(output_dir/'online_trajectories'/f'episode_{episode+1}.pkl.gz')
             row = {'episode': episode, 'seed': episode_seed, 'track': track,'env_steps': env_step,
@@ -149,7 +152,11 @@ def run_rlpd(config):
 
             # evaluate between episodes (evaluation resets the env)
             if env_step >= next_eval or env_step >= config['total_env_steps']:
-                next_eval += config['eval_every']
+                next_eval=(env_step//config['eval_every']+1)*config['eval_every']
+                report_collection(output_dir/'collection_by_track.csv',
+                    collection.summary(interval_episodes,interval_steps,env_steps=env_step))
+                interval_steps={track:0 for track in tracks}
+                interval_episodes={track:0 for track in tracks}
                 ev = config['evaluation']
                 rows,map_summaries,summary = evaluate_tracks(env,agent,config,
                     output_dir/'evaluation_episodes'/f'steps_{env_step}',to_action)

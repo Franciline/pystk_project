@@ -11,7 +11,7 @@ def plt_plot(x_data, y_data, x_label, y_label, title, filename, color="blue"):
     plt.title(title)
     plt.legend()
     plt.grid(True)
-    plt.savefig(filename)
+    plt.savefig(os.path.splitext(filename)[0]+".svg")
     plt.close()
 
 def plt_multi_agent_plot(steps_data, agent_data, x_label, y_label, title, filename):
@@ -26,7 +26,7 @@ def plt_multi_agent_plot(steps_data, agent_data, x_label, y_label, title, filena
     plt.title(title)
     plt.legend()
     plt.grid(True)
-    plt.savefig(filename)
+    plt.savefig(os.path.splitext(filename)[0]+".svg")
 
 def plt_multi_agent_plot_pos(steps_data, agent_data, x_label, y_label, title, filename):
     """Generates and saves a Matplotlib plot for multi-agent data."""
@@ -42,4 +42,4 @@ def plt_multi_agent_plot_pos(steps_data, agent_data, x_label, y_label, title, fi
     plt.grid(True)
     ax = plt.gca()
     ax.yaxis.set_major_locator(MaxNLocator(integer=True))
-    plt.savefig(filename)
+    plt.savefig(os.path.splitext(filename)[0]+".svg")

@@ -65,7 +65,9 @@ class Actor(nn.Module):
         action = torch.tanh(noise)
         # Gaussian log-prob, corrected for the tanh squashing
         log_prob = torch.distributions.Normal(mean, std).log_prob(noise)
-        log_prob = log_prob - torch.log(1 - action.pow(2) + 1e-6)
+        # Evaluate log(1 - tanh(u)^2) from u: tanh can round to +/-1 and
+        # the epsilon-based correction then loses the entropy gradient entirely.
+        log_prob = log_prob - 2 * (math.log(2) - noise - F.softplus(-2 * noise))
         return action, log_prob.sum(-1)
 
 

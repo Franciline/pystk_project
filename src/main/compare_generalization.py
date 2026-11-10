@@ -18,6 +18,7 @@ from agents.rlpd_agent import RLPDAgent
 from main.DAgger import to_action
 from pystk2_gymnasium.envs import STKRaceEnv, AgentSpec
 from utils.dagger_evaluation import evaluate_policy, append_metrics
+from utils.multitrack import track_step_limit
 from utils.observation_encoder import ObservationEncoder
 from utils.observation_normalizer import ObservationNormalizer
 
@@ -70,7 +71,7 @@ def plot_results(output):
     fig.text(.5, .01, 'Dots: completed laps; crosses: incomplete laps. Boxes include timeouts; completion counts shown above.',
              ha='center', fontsize=9)
     fig.tight_layout(rect=(0, .04, 1, .94))
-    for extension in ('png', 'svg'):
+    for extension in ('svg',):
         path = output / f'generalization_boxplots.{extension}'
         fig.savefig(path, dpi=180, bbox_inches='tight')
         print(path)
@@ -84,7 +85,7 @@ def compare(config, dagger, rlpd, device, output):
     output.mkdir(parents=True, exist_ok=True)
     with (output / 'config.json').open('x') as file:
         json.dump(dict(comparison=settings, step_size=config['step_size'],
-                       max_steps=config['max_steps'], dagger=str(dagger.resolve()),
+                       max_steps=config['max_steps'],max_steps_by_track=config.get('max_steps_by_track',{}),dagger=str(dagger.resolve()),
                        rlpd=str(rlpd.resolve()), device=device), file, indent=2)
     env = STKRaceEnv(agent=AgentSpec(rank_start=0, use_ai=False),
                      track=settings['tracks'][0], num_kart=1, laps=1,
@@ -94,7 +95,7 @@ def compare(config, dagger, rlpd, device, output):
             env.default_track = track
             for name, policy in policies.items():
                 print(f'{name} on {track}: {len(settings["seeds"])} episodes', flush=True)
-                rows, summary = evaluate_policy(env, policy, settings['seeds'], config['max_steps'], to_action)
+                rows, summary = evaluate_policy(env, policy, settings['seeds'], track_step_limit(config,track), to_action)
                 append_metrics(output / 'episodes.csv', [dict(model=name, track=track, **r) for r in rows])
                 append_metrics(output / 'summary.csv', [dict(model=name, track=track, **summary)])
                 print(f"Completed {summary['completed']}/{summary['episodes']}; mean steps={summary['steps_mean']:.1f}", flush=True)

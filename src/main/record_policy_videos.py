@@ -101,8 +101,6 @@ def record(args, model, ffmpeg):
             with Image.open(path) as raw:
                 rendered = overlay(raw.convert('RGB'),positions,views,projections,index,args.future_steps,label)
             rendered.save(path,compress_level=1)
-            if index == min(385,len(positions)-1):
-                rendered.save(args.output_dir/f'{stem}_poster.png')
         mp4 = args.output_dir/f'{stem}.mp4'
         subprocess.run([ffmpeg,'-hide_banner','-loglevel','error','-y','-framerate',str(1/args.step_size),
                         '-i',str(scratch/'%05d.png'),'-c:v','libx264','-crf','21','-pix_fmt','yuv420p',

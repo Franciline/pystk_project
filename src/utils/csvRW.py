@@ -25,7 +25,7 @@ class CSVFileManager:
         if category not in valid_categories:
             raise ValueError(f"Invalid category '{category}'. Must be one of {valid_categories}")
         
-        file_extension = ".csv" if category != "graphs" else ".png"
+        file_extension = ".csv" if category != "graphs" else ".svg"
         return os.path.join(base_dir, category, f"{track_name}_{category}{file_extension}")
 
 

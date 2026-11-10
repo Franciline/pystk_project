@@ -5,6 +5,27 @@ version](https://badge.fury.io/py/pystk2-gymnasium.svg)](https://badge.fury.io/p
 
 Read the [Changelog](./CHANGELOG.md)
 
+## Learned policies - one-lap videos
+
+Both selected checkpoints use training seed **1000**: RLPD and DAgger with Gaussian
+exploration. These graphical recordings use **Abyss**, evaluation seed **20000**,
+one kart and one lap, with deterministic actor actions and their saved normalization.
+
+| RLPD | DAgger Gaussian |
+| :---: | :---: |
+| [![RLPD lap with future trajectory dots](assets/rollouts/rlpd_abyss_seed20000.gif)](assets/rollouts/rlpd_abyss_seed20000.mp4) | [![DAgger Gaussian lap with future trajectory dots](assets/rollouts/dagger_abyss_seed20000.gif)](assets/rollouts/dagger_abyss_seed20000.mp4) |
+| [Full lap - MP4](assets/rollouts/rlpd_abyss_seed20000.mp4) | [Full lap - MP4](assets/rollouts/dagger_abyss_seed20000.mp4) |
+
+The white marker indicates the current kart position. Orange dots show its next
+**10 positions**, about **1 second** ahead. The actor predicts actions; the dots
+show the positions those actions actually produced in the simulator. Frames,
+camera matrices and positions come from the same recorded run, then the dots are
+added afterward. They are not positions predicted directly by the network.
+
+The looping previews show 16 seconds at normal speed. Click a preview for the
+complete lap. See the [recording commands](src/main/README.md#record-policy-videos)
+and the [camera binding patch](patches/README.md) to reproduce them.
+
 ## Install
 
 We assume you are on linux

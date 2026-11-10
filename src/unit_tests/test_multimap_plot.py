@@ -15,12 +15,18 @@ if __name__=='__main__':
                 rows.append(dict(track=track,split=split,**{step:5000},
                     finish_steps_mean=110,finish_steps_std=5,completion_rate=1,
                     rescue_count_mean=0,rescue_count_std=0,stuck_duration_s_mean=0,stuck_duration_s_std=0))
+            if method=='dagger':
+                rows=[dict(row,online_steps=0,finish_steps_mean=120) for row in rows]+rows
             pd.DataFrame(rows).to_csv(folder/'evaluation_by_track.csv',index=False)
             pd.DataFrame([dict(track=t,finish_steps_mean=100) for t in ['abyss','xr591']]).to_csv(folder/'expert_benchmark/summary.csv',index=False)
         plot(root/'dagger',root/'rlpd',root/'plots')
-        assert len(list((root/'plots').glob('*.pdf')))==4
-        assert len(list((root/'plots').glob('*.svg')))==4
+        assert not list((root/'plots').glob('*.pdf'))
+        assert not list((root/'plots').glob('*.png'))
+        assert len(list((root/'plots').glob('*.svg')))==8
         assert (pd.read_csv(root/'plots/comparison.csv').relative_steps_mean==1.1).all()
+        history=pd.read_csv(root/'plots/evaluation_history.csv')
+        assert history[history.method=='DAgger'].online_steps.min()==0
+        assert history[history.method=='RLPD'].online_steps.min()==5000
         for method in ['dagger','rlpd']:
             p=root/method/'evaluation_by_track.csv';data=pd.read_csv(p)
             data[['finish_steps_mean','finish_steps_std','rescue_count_mean','rescue_count_std']]=float('nan')

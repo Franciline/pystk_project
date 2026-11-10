@@ -83,8 +83,8 @@ def main():
         margin=dict(l=0, r=0, b=0, t=40)
     )
 
-    # Save plot as PNG
-    output_image = os.path.join(graph_base_dir, f"{track_name}_track_nodes_visualization.png")
+    # Save plot as SVG
+    output_image = os.path.join(graph_base_dir, f"{track_name}_track_nodes_visualization.svg")
     fig.write_image(output_image)
     print(f"Graph saved as {output_image}")
 

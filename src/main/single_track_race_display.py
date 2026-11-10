@@ -156,6 +156,9 @@ def main_loop(output, checkpoint=None, seed=None, device='auto', track=None, del
             step_size, max_steps = config['step_size'], config['max_steps']
     if track_override is not None:
         track = track_override
+    if checkpoint is not None and config:
+        from utils.multitrack import track_step_limit
+        max_steps=track_step_limit(config,track)
     print(f'Policy={checkpoint or f"Team{team}"}; track={track}, max_steps={max_steps}')
     env, agents, names = create_race(policy, track, step_size, team)
     try:

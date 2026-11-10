@@ -18,8 +18,8 @@ def test_plot():
             metrics.append(dict(model=name,n_steps=2,terminated=True))
         pd.DataFrame(metrics).to_csv(root/'summary.csv',index=False)
         plot_trajectories(root,root/'plots')
-        assert (root/'plots/trajectories_test_seed1.pdf').stat().st_size>0
         assert (root/'plots/trajectories_test_seed1.svg').stat().st_size>0
+        assert not list((root/'plots').glob('*.pdf')) and not list((root/'plots').glob('*.png'))
 
 
 if __name__ == '__main__':

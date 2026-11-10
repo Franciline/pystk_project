@@ -23,7 +23,8 @@ from pystk2_gymnasium.envs import STKRaceEnv, AgentSpec
 from utils.dataset_recorder import DatasetRecorder
 from utils.episode_deduplication import drop_duplicates
 from utils.dagger_evaluation import evaluate_policy, append_metrics, is_improvement
-from utils.multitrack import train_tracks, next_track, evaluate_tracks
+from utils.multitrack import (train_tracks,next_track,evaluate_tracks,track_step_limit,
+    prepare_config,save_expert_reference,MapCollection,report_collection)
 
 CONFIG_PATH = Path(__file__).with_name('dagger_config.yaml')
 BUTTONS = ('brake', 'drift', 'fire', 'nitro', 'rescue')
@@ -179,6 +180,7 @@ def run_dagger(config, *, learner=None, train_policy=None):
     Whole episodes finish (or time out) before checking the round's step budget.
     All rounds train on the aggregate and evaluate without exploration.
     """
+    config = prepare_config(config)
     root = Path(__file__).resolve().parents[2]
     output_dir = Path(config['output_dir'])
     if not output_dir.is_absolute():
@@ -186,24 +188,22 @@ def run_dagger(config, *, learner=None, train_policy=None):
     output_dir.mkdir(parents=True, exist_ok=True)
     with (output_dir / 'config.json').open('x') as file:
         json.dump(config, file, indent=2)
-    tracks, max_steps = train_tracks(config), config['max_steps']
+    tracks = train_tracks(config)
     track = tracks[0]
     initial = config['initialization']
     evaluation = config['evaluation']
     best, paths = None, []
-    initial_steps, online_steps, episode_index = 0, 0, 0
-    benchmark = config.get('expert_benchmark')
-    if benchmark:
-        from main.benchmark_expert import run_benchmark
-        start = benchmark['seed_start']
-        run_benchmark(config, output_dir / 'expert_benchmark',
-                      list(range(start, start + benchmark['runs'])))
+    initial_steps, online_steps = 0, 0
+    collection=MapCollection(tracks,config["online_seed_start"])
+    initial_episode_counts={track:0 for track in tracks}
+    save_expert_reference(config,output_dir)
     env = STKRaceEnv(agent=AgentSpec(rank_start=0, use_ai=False), track=track,
                      num_kart=1, laps=1, step_size=config['step_size'])
     try:
         for iteration in range(1, config['N'] + 1):
             round_steps = 0
             map_steps = {track:0 for track in tracks}
+            map_episodes = {track:0 for track in tracks}
             if iteration == 1 and initial['mode'] == 'load_offline':
                 source = Path(initial['dataset'])
                 if not source.is_absolute():
@@ -227,15 +227,15 @@ def run_dagger(config, *, learner=None, train_policy=None):
                         track = next_track(tracks,map_steps)
                         epsilon = config['online_epsilon']
                     env.default_track = track
-                    episode_seed = config['online_seed_start'] + episode_index
-                    episode_index += 1
+                    episode_seed = (config['online_seed_start']+initial_episode_counts[track]
+                                    if iteration==1 else collection.next_seed(track))
                     episode += 1
                     path = output_dir / f'iteration_{iteration}' / f'episode_{episode}.pkl.gz'
                     print(f'Iteration {iteration}/{config["N"]}, episode {episode}, '
                           f'epsilon={epsilon}, round steps={round_steps}', flush=True)
                     exploration = config.get('exploration', {}) if iteration > 1 else {}
                     metrics = collect_episode(env, learner, beta=1.0 if iteration == 1 else 0.0,
-                        seed=episode_seed, max_steps=max_steps, output=path,
+                        seed=episode_seed, max_steps=track_step_limit(config,track), output=path,
                         iteration=iteration, step_size=config['step_size'], epsilon=epsilon,
                         exploration_mode=exploration.get('mode', 'random'),
                         acceleration_std=exploration.get('acceleration_std', 0.05),
@@ -247,12 +247,18 @@ def run_dagger(config, *, learner=None, train_policy=None):
                     map_steps[track] += metrics['n_steps']
                     if iteration == 1:
                         initial_steps += metrics['n_steps']
+                        initial_episode_counts[track]+=1
                     else:
                         online_steps += metrics['n_steps']
+                        collection.record(track,metrics['n_steps'])
+                        map_episodes[track]+=1
                     append_metrics(output_dir / 'metrics.csv', [dict(
                         **metrics, track=track, iteration_steps=round_steps,
                         initial_steps=initial_steps, online_steps=online_steps,
                         aggregate_transitions=initial_steps + online_steps)])
+            online_map_steps=map_steps if iteration>1 else {track:0 for track in tracks}
+            report_collection(output_dir/'collection_by_track.csv',
+                collection.summary(map_episodes,online_map_steps,iteration=iteration,online_steps=online_steps))
             with (output_dir / 'episodes.json').open('w') as file:
                 json.dump([str(p.relative_to(output_dir)) for p in paths], file, indent=2)
             train_policy(learner, tuple(paths), iteration)

@@ -46,20 +46,17 @@ def plot_segments(geometry_dir, output):
     fig.text(.5, .015, 'Segments concatenated in segment-ID order; this is not a spatial route drawing. Branches may make the sum differ from official track length.',
              ha='center', fontsize=9)
     fig.tight_layout(rect=(0, .05, 1, 1))
-    output = Path(output)
+    output = Path(output).with_suffix('.svg')
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, dpi=200, bbox_inches='tight')
-    # Vector version allows zooming into dense segment boundaries.
-    fig.savefig(output.with_suffix('.svg'), bbox_inches='tight')
     plt.close(fig)
     print(output)
-    print(output.with_suffix('.svg'))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--experiment', type=Path, default=Path('datasets/dagger'))
-    parser.add_argument('--output', type=Path, help='Default: <experiment>/plots/track_segments.png')
+    parser.add_argument('--output', type=Path, help='Default: <experiment>/plots/track_segments.svg')
     args = parser.parse_args()
     plot_segments(args.experiment / 'expert_benchmark' / 'track_geometry',
-                  args.output or args.experiment / 'plots' / 'track_segments.png')
+                  args.output or args.experiment / 'plots' / 'track_segments.svg')

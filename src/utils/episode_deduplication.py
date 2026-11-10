@@ -15,3 +15,16 @@ def drop_duplicates(episodes):
             unique.append(episode)
     return unique
 
+
+
+def deduplication_report(episodes, unique):
+    """Per-map/epsilon counts and transition totals, before and after exact dedup."""
+    groups=sorted({(e['metadata']['track'],float(e['metadata']['epsilon'])) for e in episodes})
+    rows=[]
+    for track,epsilon in groups:
+        before=[e for e in episodes if e['metadata']['track']==track and float(e['metadata']['epsilon'])==epsilon]
+        after=[e for e in unique if e['metadata']['track']==track and float(e['metadata']['epsilon'])==epsilon]
+        rows.append(dict(track=track,epsilon=epsilon,trajectories_before=len(before),
+            trajectories_after=len(after),steps_before=sum(len(e['actions']) for e in before),
+            steps_after=sum(len(e['actions']) for e in after)))
+    return rows

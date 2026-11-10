@@ -26,7 +26,8 @@ def test_comparison():
         assert calls==[('abyss',5),('abyss',5),('snowtuxpeak',5),('snowtuxpeak',5)]
         assert len(pd.read_csv(output/'episodes.csv'))==20
         assert len(pd.read_csv(output/'summary.csv'))==4
-        assert (output/'generalization_boxplots.png').stat().st_size>0
+        assert (output/'generalization_boxplots.svg').stat().st_size>0
+        assert not list(output.glob('*.pdf')) and not list(output.glob('*.png'))
 
 
 if __name__ == '__main__':

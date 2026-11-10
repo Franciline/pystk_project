@@ -108,7 +108,7 @@ def run(args):
     ax.axis('off')
     args.output_dir.mkdir(parents=True, exist_ok=True)
     stem = args.output_dir / f'trajectory_screenshot_{args.model}_{config["track"]}_step{args.step}'
-    for suffix in ('pdf','svg','png'):
+    for suffix in ('svg',):
         fig.savefig(stem.with_suffix('.'+suffix),bbox_inches='tight',pad_inches=0)
     stem.with_suffix('.json').write_text(json.dumps(metadata,indent=2))
     if view is not None:

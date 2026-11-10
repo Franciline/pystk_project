@@ -25,7 +25,7 @@ def evaluate_policy(env, learner, seeds, max_steps, to_action, policy_factory=No
                 from utils.dataset_recorder import DatasetRecorder
                 recorder = DatasetRecorder(env, diagnostics, expert_labels=False)
                 recorder.start_episode(obs, metadata=dict(track=env.current_track,seed=seed,
-                    step_size=env.step_size,role='evaluation',laps=1,num_kart=1))
+                    step_size=env.step_size,max_steps=max_steps,role='evaluation',laps=1,num_kart=1))
             for step in range(max_steps):
                 action = to_action(policy.choose_action(obs))
                 obs, reward, terminated, truncated, _ = env.step(action)

@@ -31,7 +31,7 @@ def plot_comparison(dagger, rlpd, output_dir, dagger_label='DAgger (loaded offli
     # Seaborn darkgrid appearance bundled with Matplotlib; no extra dependency.
     plt.style.use('seaborn-v0_8-darkgrid')
     plt.rcParams.update({'font.size': 11, 'axes.titlesize': 15,
-                         'axes.labelsize': 12, 'svg.fonttype': 'none', 'pdf.fonttype': 42})
+                         'axes.labelsize': 12, 'svg.fonttype': 'none'})
     colors = ['#4C72B0', '#DD8452']
     summaries, distributions = [], []
     fig, ax = plt.subplots(figsize=(15, 4.8))
@@ -59,7 +59,7 @@ def plot_comparison(dagger, rlpd, output_dir, dagger_label='DAgger (loaded offli
     fig.legend(handles, labels, loc='lower center', bbox_to_anchor=(.5, .045),
                ncol=2, fontsize=10, frameon=False)
     fig.tight_layout(rect=(0, .10, 1, 1))
-    for suffix in ('pdf', 'svg'):
+    for suffix in ('svg',):
         path = output / f'dagger_rlpd_paired_episodes.{suffix}'
         fig.savefig(path, bbox_inches='tight')
         print(path)
@@ -79,7 +79,7 @@ def plot_comparison(dagger, rlpd, output_dir, dagger_label='DAgger (loaded offli
     ax.set(title=f'Distribution of episode steps across {len(seeds)} test seeds',
            ylabel='Episode steps')
     fig.tight_layout()
-    for suffix in ('pdf', 'svg'):
+    for suffix in ('svg',):
         path = output / f'dagger_rlpd_step_distribution.{suffix}'
         fig.savefig(path, bbox_inches='tight')
         print(path)

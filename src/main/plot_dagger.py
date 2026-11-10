@@ -36,7 +36,7 @@ def plot_results(experiment, output_dir=None):
                 ax.set(title=column.upper(), xlabel='Logged training epoch', ylabel='Loss')
                 ax.grid(alpha=.2)
             fig.suptitle('Training loss — vertical lines separate DAgger iterations')
-            save(fig, 'losses.png')
+            save(fig, 'losses.svg')
 
     evaluation = experiment / 'evaluation.csv'
     if not evaluation.exists():
@@ -81,7 +81,7 @@ def plot_results(experiment, output_dir=None):
             ax.grid(alpha=.2)
             ax.legend()
     fig.suptitle('Actor versus expert — bands show episode standard deviation, not confidence intervals')
-    save(fig, 'evaluation_by_track.png')
+    save(fig, 'evaluation_by_track.svg')
 
     if 'relative_finish_steps' in data:
         fig, ax = plt.subplots(figsize=(8, 4.5))
@@ -93,7 +93,7 @@ def plot_results(experiment, output_dir=None):
                title='Relative speed — completed episodes only; lower is faster')
         ax.grid(alpha=.2)
         ax.legend()
-        save(fig, 'relative_steps.png')
+        save(fig, 'relative_steps.svg')
 
     aggregate_path = experiment / 'evaluation_aggregate.csv'
     if aggregate_path.exists():
@@ -104,7 +104,7 @@ def plot_results(experiment, output_dir=None):
             ax.plot(rows['training_steps'], rows[metric], marker='o')
             ax.set(xlabel='Cumulative collection steps', ylabel=label)
             ax.grid(alpha=.2)
-        save(fig, 'training_maps_aggregate.png')
+        save(fig, 'training_maps_aggregate.svg')
     return saved
 
 
@@ -131,7 +131,7 @@ def plot_relative_comparison(protocol, seeds, output_dir=None, relative=True):
     expert = pd.read_csv(dagger / 'expert_benchmark' / 'summary.csv')
     reference = float(expert.loc[expert['track'] == config['track'], 'finish_steps_mean'].iloc[0])
     plt.style.use('seaborn-v0_8-darkgrid')
-    plt.rcParams.update({'svg.fonttype': 'none', 'pdf.fonttype': 42})
+    plt.rcParams.update({'svg.fonttype': 'none'})
     fig, ax = plt.subplots(figsize=(14, 3.8) if not relative else (11, 4.8))
     scale = reference if relative else 1.0
     stem = 'relative_steps_comparison' if relative else 'finishing_steps_comparison'
@@ -161,13 +161,13 @@ def plot_relative_comparison(protocol, seeds, output_dir=None, relative=True):
     ax.set(xlabel='Online collection steps', ylabel=title, title=title)
     ax.legend(frameon=False)
     fig.tight_layout()
-    for suffix in ('pdf','svg'):
+    for suffix in ('svg',):
         path = output / f'{stem}.{suffix}'
         fig.savefig(path, bbox_inches='tight')
         print(path)
     plt.close(fig)
     pd.DataFrame(summaries).to_csv(output / f'{stem}.csv', index=False)
-    return output / f'{stem}.pdf'
+    return output / f'{stem}.svg'
 
 
 def plot_initialization_details(protocol, seeds, output_dir=None):
@@ -199,9 +199,8 @@ def plot_initialization_details(protocol, seeds, output_dir=None):
         axes[0].set_ylim(-.05, 1.05)
         fig.suptitle(f'Initialization comparison — training seed {seed}; bands: evaluation episode std')
         fig.tight_layout()
-        path = output / f'initialization_seed{seed}.png'
+        path = output / f'initialization_seed{seed}.svg'
         fig.savefig(path, dpi=180, bbox_inches='tight')
-        fig.savefig(path.with_suffix('.svg'), bbox_inches='tight')
         plt.close(fig)
         print(path)
 
@@ -261,9 +260,8 @@ def plot_initialization_details(protocol, seeds, output_dir=None):
     axes[1].set_ylabel('Episode steps (timeouts included)')
     fig.suptitle('Selected best actors — 20 held-out seeds; dashed mean, shaded ±1 episode std')
     fig.tight_layout()
-    path = output / 'initialization_best_actors.png'
+    path = output / 'initialization_best_actors.svg'
     fig.savefig(path, dpi=180, bbox_inches='tight')
-    fig.savefig(path.with_suffix('.svg'), bbox_inches='tight')
     plt.close(fig)
     pd.DataFrame(rows_out).to_csv(output / 'initialization_best_actors.csv', index=False)
     print(path)

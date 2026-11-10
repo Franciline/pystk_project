@@ -36,7 +36,7 @@ def plot_completion(dagger, rlpd, output):
     fig.tight_layout(rect=(0, .08, 1, 1))
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
-    for suffix in ('png', 'svg'):
+    for suffix in ('svg',):
         path = output / f'gaussian_dagger_rlpd_completion.{suffix}'
         fig.savefig(path, dpi=180, bbox_inches='tight')
         print(path)

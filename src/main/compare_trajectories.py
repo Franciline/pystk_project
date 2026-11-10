@@ -132,7 +132,7 @@ def plot_trajectories(directory, output, width_scale=1.5):
     polygons = np.stack([segments[:,0]+offsets[:,0], segments[:,1]+offsets[:,1],
                          segments[:,1]-offsets[:,1], segments[:,0]-offsets[:,0]], axis=1)
     plt.style.use('default')
-    plt.rcParams.update({'svg.fonttype':'none', 'pdf.fonttype':42})
+    plt.rcParams.update({'svg.fonttype':'none'})
     fig, ax = plt.subplots(figsize=(11, 9))
     ax.set_facecolor('#82AA63')
     # Decorative mowing stripes, not simulator terrain/scenery reconstruction.
@@ -223,7 +223,7 @@ def plot_trajectories(directory, output, width_scale=1.5):
     fig.tight_layout()
     output.mkdir(parents=True,exist_ok=True)
     stem = output / f'trajectories_{config["track"]}_seed{config["seed"]}'
-    for extension in ('pdf','svg'):
+    for extension in ('svg',):
         fig.savefig(stem.with_suffix('.'+extension),bbox_inches='tight')
         print(stem.with_suffix('.'+extension))
     plt.close(fig)

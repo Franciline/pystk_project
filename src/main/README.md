@@ -155,7 +155,7 @@ uv run src/main/plot_dagger.py --experiment datasets/dagger
 - `--experiment`: required experiment directory containing CSV logs.
 - `--output-dir`: optional destination; defaults to `<experiment>/plots/`.
 
-Writes `losses.png` (MSE/BCE/total by logged epoch), `evaluation_by_track.png` (completion and all/successful episode steps, with expert reference lines), `relative_steps.png` (actor/expert finishing-step ratio), and `training_maps_aggregate.png` (aggregate training-map performance versus collected steps). The last two require the corresponding newer log columns/files. Standard-deviation bands show variation across episodes, not uncertainty across independent training runs. Unavailable statistics remain blank; successful-only speed must be read alongside completion rate. Run again after training to refresh plots.
+Writes `losses.svg` (MSE/BCE/total by logged epoch), `evaluation_by_track.svg` (completion and all/successful episode steps, with expert reference lines), `relative_steps.svg` (actor/expert finishing-step ratio), and `training_maps_aggregate.svg` (aggregate training-map performance versus collected steps). The last two require the corresponding newer log columns/files. Standard-deviation bands show variation across episodes, not uncertainty across independent training runs. Unavailable statistics remain blank; successful-only speed must be read alongside completion rate. Run again after training to refresh plots.
 
 ## Track segment strips — `plot_track_segments.py`
 
@@ -163,7 +163,7 @@ Writes `losses.png` (MSE/BCE/total by logged epoch), `evaluation_by_track.png` (
 uv run src/main/plot_track_segments.py --experiment datasets/dagger
 ```
 
-One horizontal row per map, measured in meters, with vertical ticks separating segments. Reads `expert_benchmark/track_geometry/*_segments.csv`. Saves `plots/track_segments.png` and a zoomable `plots/track_segments.svg`. Optional `--output path/to/figure.png` overrides destination. Segments are concatenated in segment-ID order; branched tracks need not sum to official track length, which is also shown in the labels.
+One horizontal row per map, measured in meters, with vertical ticks separating segments. Reads `expert_benchmark/track_geometry/*_segments.csv`. Saves a zoomable `plots/track_segments.svg`. Optional `--output path/to/figure.svg` overrides destination. Segments are concatenated in segment-ID order; branched tracks need not sum to official track length, which is also shown in the labels.
 
 ## Watch expert/random mixtures
 
@@ -192,7 +192,7 @@ uv run src/main/plot_dagger.py --compare-protocol datasets/protocol --seeds 1000
 
 Reads all `dagger_seed*` and `dagger_offline_seed*` evaluation logs and their expert benchmark summaries. One curve per initialization averages actor/expert finishing-step ratios across training seeds; bands show ±1 sample standard deviation across those seeds (not across evaluation laps). Expert mean is treated as a fixed reference; 1 means expert speed, below 1 faster, above 1 slower. X-axis excludes initial data and measures new online collection steps. Runs are aligned every 5000 steps using their latest available evaluation and limited to their common budget. Successful laps only; completion means are included in the accompanying CSV. This compares online sample use, not equal total initial-data budgets.
 
-Saves `datasets/protocol/plots/relative_steps_comparison.png`, `.svg`, and `.csv`. Optional `--output-dir` changes the destination. Existing per-experiment plotting commands still work.
+Saves `datasets/protocol/plots/relative_steps_comparison.svg`, and `.csv`. Optional `--output-dir` changes the destination. Existing per-experiment plotting commands still work.
 
 ## Gaussian or random exploration during DAgger collection
 
@@ -219,8 +219,8 @@ uv run src/main/DAgger.py exploration.mode=random online_epsilon=0.1 output_dir=
 
 The same `--compare-protocol` command also creates:
 
-- `initialization_seed1000.png`, `initialization_seed2000.png`, `initialization_seed3000.png` (plus SVG): one figure per training seed, with two initialization curves comparing completion, all-episode steps, and successful finishing steps. Bands show evaluation-episode standard deviation.
-- `initialization_best_actors.png` / `.svg`: each method's selected best actor, evaluated on matching seeds; completion and per-episode steps appear side by side, with mean-step reference lines.
+- `initialization_seed1000.svg`, `initialization_seed2000.svg`, `initialization_seed3000.svg` (SVG only): one figure per training seed, with two initialization curves comparing completion, all-episode steps, and successful finishing steps. Bands show evaluation-episode standard deviation.
+- `initialization_best_actors.svg`: each method's selected best actor, evaluated on matching seeds; completion and per-episode steps appear side by side, with mean-step reference lines.
 - `initialization_best_actors.csv`: selected training seed, iteration, source, and saved metrics. Selection uses completion first, finishing steps second, then lowest seed for exact ties.
 
 These use the existing recorded evaluations, without rerunning actors. Best-actor plots are selected validation results; use all-run curves for comparing methods. Initial data sizes differ and are excluded from the online-step axis.
@@ -242,7 +242,7 @@ uv run src/main/plot_dagger.py --compare-protocol datasets/protocol --seeds 1000
 uv run src/main/plot_final_comparison.py --dagger datasets/protocol/dagger_offline_seed1000 --rlpd datasets/protocol/rlpd_seed3000
 ```
 
-Reads only `checkpoint=best` rows from each run's `final_test_episodes.csv`; requires matching test seeds. These runs were chosen by validation, not test outcomes. Creates paired seed curves with mean/std, boxplots with episode points, and RLPD-minus-DAgger differences on jointly successful laps. Incomplete episodes are marked with crosses; all-episode step statistics include timeouts. Saves `dagger_rlpd_final_comparison.png`/`.svg`, `dagger_rlpd_final_summary.csv`, and `dagger_rlpd_final_paired.csv` under `datasets/protocol/plots/`. Optional `--output-dir` changes destination. No simulator rerun is required. This compares selected checkpoints, not mean performance over all training seeds.
+Reads only `checkpoint=best` rows from each run's `final_test_episodes.csv`; requires matching test seeds. These runs were chosen by validation, not test outcomes. Creates paired seed curves with mean/std, boxplots with episode points, and RLPD-minus-DAgger differences on jointly successful laps. Incomplete episodes are marked with crosses; all-episode step statistics include timeouts. Saves `dagger_rlpd_final_comparison.svg`, `dagger_rlpd_final_summary.csv`, and `dagger_rlpd_final_paired.csv` under `datasets/protocol/plots/`. Optional `--output-dir` changes destination. No simulator rerun is required. This compares selected checkpoints, not mean performance over all training seeds.
 
 ## Saved RLPD reward evolution
 
@@ -250,7 +250,7 @@ Reads only `checkpoint=best` rows from each run's `final_test_episodes.csv`; req
 uv run src/main/plot_rlpd_rewards.py --run datasets/protocol/rlpd_seed3000
 ```
 
-Plots training episode returns from `online_episodes.csv`, plus return versus episode duration. Saves `<run>/plots/episode_returns.png` and SVG; optional `--output-dir` overrides destination. These are stochastic training-policy returns, not best-checkpoint final-test rewards. Existing logs do not store within-lap per-step rewards; those require a new recorded rollout.
+Plots training episode returns from `online_episodes.csv`, plus return versus episode duration. Saves `<run>/plots/episode_returns.svg` (SVG only); optional `--output-dir` overrides destination. These are stochastic training-policy returns, not best-checkpoint final-test rewards. Existing logs do not store within-lap per-step rewards; those require a new recorded rollout.
 
 
 ## Compare checkpoint generalization on two maps
@@ -270,7 +270,7 @@ comparison:
   output_dir: datasets/protocol/comparison
 ```
 
-Runs five episodes per model per map (20 total). Saves `episodes.csv`, `summary.csv`, `config.json`, and grouped `generalization_boxplots.png`/`.svg`. One x-axis group per map, two boxes per group. Boxes include timeout episode lengths; crosses mark failures and labels report completion counts. Failed episodes must not be interpreted as successful lap times. Normalization stays frozen to training data on every map. This is an exploratory generalization test; the default seeds overlap earlier final-test seeds on abyss.
+Runs five episodes per model per map (20 total). Saves `episodes.csv`, `summary.csv`, `config.json`, and grouped `generalization_boxplots.svg`. One x-axis group per map, two boxes per group. Boxes include timeout episode lengths; crosses mark failures and labels report completion counts. Failed episodes must not be interpreted as successful lap times. Normalization stays frozen to training data on every map. This is an exploratory generalization test; the default seeds overlap earlier final-test seeds on abyss.
 
 Options: `--config` selects another YAML, `--output-dir` selects a fresh destination, `--device auto|cpu|mps` selects inference device. Existing result folders are protected by their config file. Replot without rerunning policies:
 
@@ -298,7 +298,7 @@ uv run src/main/plot_final_comparison.py \
   --output-dir datasets/protocol/plots/gaussian_vs_rlpd_seed1000
 ```
 
-The test results are already saved; do not rerun the first command unless using a fresh test destination. Plotting is repeatable. Adds `dagger_rlpd_mean_std_and_episodes.png`/`.svg`: constant mean lines with ±1 episode-std bands above and actual paired seed results below. Other comparison figures and CSVs are also written. This explicitly compares RLPD seed 1000 as requested; RLPD seed 3000 remains the validation winner across its three training seeds.
+The test results are already saved; do not rerun the first command unless using a fresh test destination. Plotting is repeatable. Adds `dagger_rlpd_mean_std_and_episodes.svg`: constant mean lines with ±1 episode-std bands above and actual paired seed results below. Other comparison figures and CSVs are also written. This explicitly compares RLPD seed 1000 as requested; RLPD seed 3000 remains the validation winner across its three training seeds.
 
 ## Completion over evaluation rounds (Gaussian DAgger vs RLPD seed 1000)
 
@@ -306,11 +306,11 @@ The test results are already saved; do not rerun the first command unless using 
 uv run src/main/plot_evaluation_completion.py
 ```
 
-Reads both evaluation histories and saves `datasets/protocol/plots/gaussian_dagger_rlpd_completion.png`, SVG, and CSV. X labels are nominal 5k budget rounds; CSV retains actual online steps. DAgger's zero point follows offline training; RLPD has no recorded zero-point evaluation. Both current runs have 100% completion at all recorded evaluations. Optional `--dagger`, `--rlpd` select run folders; `--output-dir` changes destination.
+Reads both evaluation histories and saves `datasets/protocol/plots/gaussian_dagger_rlpd_completion.svg` and CSV. X labels are nominal 5k budget rounds; CSV retains actual online steps. DAgger's zero point follows offline training; RLPD has no recorded zero-point evaluation. Both current runs have 100% completion at all recorded evaluations. Optional `--dagger`, `--rlpd` select run folders; `--output-dir` changes destination.
 
 ## Final-use figure style
 
-New final-use figures use Seaborn darkgrid styling, separate images per plot, and PDF/SVG vector exports under `datasets/plots/`. The final comparison uses Matplotlib's bundled `seaborn-v0_8-darkgrid` style, without requiring a seaborn installation.
+New final-use figures use Seaborn darkgrid styling, separate images per plot, and SVG vector exports under `datasets/plots/`. The final comparison uses Matplotlib's bundled `seaborn-v0_8-darkgrid` style, without requiring a seaborn installation.
 
 ```bash
 uv run src/main/plot_final_comparison.py \
@@ -319,7 +319,7 @@ uv run src/main/plot_final_comparison.py \
   --dagger-label 'DAgger Gaussian' --rlpd-label 'RLPD'
 ```
 
-Writes `dagger_rlpd_paired_episodes.pdf`/`.svg` (wide seed-by-seed lines, mean/std) and `dagger_rlpd_step_distribution.pdf`/`.svg` (filled boxes and actual episode points). No step-difference plot or combined subplot image is produced. Older protocol PNGs remain historical outputs. Default output directory is now `datasets/plots/`; omit older `--output-dir datasets/protocol/...` overrides to use it. Box medians are dark, not the default orange. Standard 1.5×IQR whiskers can coincide with box edges when all more extreme observations are outliers; all observations remain visible as points.
+Writes `dagger_rlpd_paired_episodes.svg` (wide seed-by-seed lines, mean/std) and `dagger_rlpd_step_distribution.svg` (filled boxes and actual episode points). No step-difference plot or combined subplot image is produced. Generated PDF/PNG copies have been removed; static plots now export SVG only. Default output directory is now `datasets/plots/`; omit older `--output-dir datasets/protocol/...` overrides to use it. Box medians are dark, not the default orange. Standard 1.5×IQR whiskers can coincide with box edges when all more extreme observations are outliers; all observations remain visible as points.
 
 ### Final relative learning curves: Expert, Gaussian DAgger, RLPD
 
@@ -327,7 +327,7 @@ Writes `dagger_rlpd_paired_episodes.pdf`/`.svg` (wide seed-by-seed lines, mean/s
 uv run src/main/plot_dagger.py --relative-best datasets/protocol
 ```
 
-Selects the best validation run across seeds 1000/2000/3000 for Gaussian loaded-offline DAgger and RLPD (currently DAgger 1000 and RLPD 3000). Plots their full validation histories at actual online-step counts, using a common Team4 validation benchmark mean as denominator. Labels: Expert (team4), DAgger, RLPD. Bands are evaluation episode std divided by expert mean, not std across training runs. No invented RLPD point at zero. Writes PDF/SVG and CSV under `datasets/plots/` by default, with darkgrid style and no footer. This replaces the earlier relative initialization-comparison function; use per-seed initialization figures for those comparisons.
+Selects the best validation run across seeds 1000/2000/3000 for Gaussian loaded-offline DAgger and RLPD (currently DAgger 1000 and RLPD 3000). Plots their full validation histories at actual online-step counts, using a common Team4 validation benchmark mean as denominator. Labels: Expert (team4), DAgger, RLPD. Bands are evaluation episode std divided by expert mean, not std across training runs. No invented RLPD point at zero. Writes SVG and CSV under `datasets/plots/` by default, with darkgrid style and no footer. This replaces the earlier relative initialization-comparison function; use per-seed initialization figures for those comparisons.
 
 For the same learning curves in actual finishing steps, without expert normalization:
 
@@ -335,7 +335,7 @@ For the same learning curves in actual finishing steps, without expert normaliza
 uv run src/main/plot_dagger.py --steps-best datasets/protocol
 ```
 
-Saves `datasets/plots/finishing_steps_comparison.pdf`, `.svg`, and `.csv`. Same selected runs, actual online-step x-axis, Team4 mean reference line, and evaluation-episode standard-deviation bands as the relative plot.
+Saves `datasets/plots/finishing_steps_comparison.svg`, and `.csv`. Same selected runs, actual online-step x-axis, Team4 mean reference line, and evaluation-episode standard-deviation bands as the relative plot.
 
 ## Matched 2D trajectories - Expert, DAgger, RLPD
 
@@ -347,7 +347,7 @@ Runs each policy separately, alone on abyss with seed 20000, one lap, then overl
 
 Data default: `datasets/protocol/trajectories_abyss_seed20000/`. Saves per-policy CSVs with positions, velocity, speed, track progress, on-road state, rewards and executed controls, plus track geometry, settings, and rollout summaries. Traveled distance includes any simulator teleports, so treat it as diagnostic until rescue/jump handling is refined. Off-road steps are not fall counts. Existing data is protected by exclusive configuration creation; pass a fresh `--data-dir` for new rollouts.
 
-Final figure: `datasets/plots/trajectories_abyss_seed20000.pdf` and SVG, with darkgrid styling, approximate road strips, matched paths, a start marker, and endpoint dots. Overhead projection hides elevation/overpasses. A gap is drawn for consecutive positions more than 20 m apart to avoid connecting teleports. Replot without running the simulator:
+Final figure: `datasets/plots/trajectories_abyss_seed20000.svg`, with darkgrid styling, approximate road strips, matched paths, a start marker, and endpoint dots. Overhead projection hides elevation/overpasses. A gap is drawn for consecutive positions more than 20 m apart to avoid connecting teleports. Replot without running the simulator:
 
 ```bash
 uv run src/main/compare_trajectories.py --plot-only
@@ -370,7 +370,7 @@ uv run src/main/plot_trajectory_screenshot.py --model rlpd --step 200 --future-s
 
 Replays the selected model (`rlpd`, `dagger`, or `expert`) using the track, seed and
 checkpoint paths in `--data-dir/config.json`. The default data directory is
-`datasets/protocol/trajectories_abyss_seed20000_normalized`. Saves PDF, SVG, PNG
+`datasets/protocol/trajectories_abyss_seed20000_normalized`. Saves SVG
 and JSON metadata in `datasets/plots/` (`--output-dir` overrides this).
 The JSON records the current and future world positions from the same replay.
 The installed PySTK build returns no player camera matrices. A tested C++ patch
@@ -421,7 +421,7 @@ Requires FFmpeg and Pillow. Defaults are Gaussian DAgger
   defaults 20000, abyss, 1000, 0.1 and auto.
 - `--preview-start`, `--preview-seconds`: GIF preview window, defaults 30 and 16
   seconds. The MP4 always contains the full recorded lap.
-- `--output-dir`: MP4, GIF and poster PNG files, default `assets/rollouts`.
+- `--output-dir`: MP4 and GIF files, default `assets/rollouts`.
 - `--record-dir`: positions, camera matrices, times, executed actions and run
   metadata, default `datasets/protocol/rollout_videos`. Existing run directories
   are refused; choose another directory to record again.
