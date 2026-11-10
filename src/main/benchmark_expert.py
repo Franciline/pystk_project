@@ -10,6 +10,7 @@ from main.DAgger import CONFIG_PATH, to_action
 from agents.team4.agent4 import Agent4
 from pystk2_gymnasium.envs import STKRaceEnv, AgentSpec
 from utils.track_diagnostics import save_track_diagnostics
+from utils.multitrack import evaluation_tracks
 from utils.dagger_evaluation import evaluate_policy, append_metrics
 
 
@@ -18,7 +19,7 @@ def run_benchmark(config, output_dir, seeds):
     output_dir.mkdir(parents=True, exist_ok=True)
     with (output_dir / 'config.json').open('x') as file:
         json.dump(dict(task_config=config, seeds=seeds, expert='team4'), file, indent=2)
-    tracks = [config['track']] if 'track' in config else config['train_tracks'] + config['unseen_tracks']
+    tracks = evaluation_tracks(config)
     env = STKRaceEnv(agent=AgentSpec(rank_start=0, use_ai=False),
                      track=tracks[0], num_kart=1, laps=1, step_size=config['step_size'])
     try:
@@ -27,7 +28,8 @@ def run_benchmark(config, output_dir, seeds):
             env.default_track = track
             rows, summary = evaluate_policy(
                 env, None, seeds, config['max_steps'], to_action,
-                policy_factory=lambda env: Agent4(env, path_lookahead=3))
+                policy_factory=lambda env: Agent4(env, path_lookahead=3),
+                diagnostics=config.get('diagnostics'),record_dir=output_dir/'episodes'/track)
             save_track_diagnostics(env, output_dir)
             summaries[track] = summary
             append_metrics(output_dir / 'episodes.csv', [dict(track=track, **r) for r in rows])

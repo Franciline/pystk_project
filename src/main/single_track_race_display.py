@@ -110,19 +110,27 @@ def single_race(env, agents, names, output, seed=None, max_steps=MAX_STEPS, acto
         recorder.save_episode(output)
         print(f"Saved {step + 1} steps to {output}")
 
-def load_rlpd(checkpoint, config):
+def load_rlpd(checkpoint, config, no_normalization=False):
+    if not no_normalization and not (checkpoint.parent / 'normalizer.npz').exists():
+        from main.compare_generalization import load_rlpd as load_checkpoint
+        return load_checkpoint(checkpoint, config['rlpd'].get('device', 'auto'))
     # rebuild the RLPD agent with the run's own settings
     from agents.rlpd_agent import RLPDAgent
     from utils.observation_encoder import ObservationEncoder
     from utils.observation_normalizer import ObservationNormalizer
     encoder = ObservationEncoder(config['encoder']['num_paths'], config['encoder']['num_items'])
-    normalizer = ObservationNormalizer.load(checkpoint.parent / 'normalizer.npz', encoder)
+    if no_normalization:
+        normalizer = ObservationNormalizer(encoder)
+        normalizer.mean = np.zeros(encoder.output_size)
+        normalizer.scale = np.ones(encoder.output_size)
+    else:
+        normalizer = ObservationNormalizer.load(checkpoint.parent / 'normalizer.npz', encoder)
     policy = RLPDAgent(config, encoder, normalizer, config['seed'])
     policy.load(checkpoint)
     return policy
 
 
-def main_loop(output, checkpoint=None, seed=None, device='auto', track=None, delay=0, team=4, epsilon=0.0, hold_steps=1):
+def main_loop(output, checkpoint=None, seed=None, device='auto', track=None, delay=0, team=4, epsilon=0.0, hold_steps=1, no_normalization=False):
     if not 0 <= epsilon <= 1 or hold_steps < 1:
         raise ValueError('Require epsilon in [0, 1] and hold_steps >= 1')
     if checkpoint is not None and epsilon > 0:
@@ -134,10 +142,15 @@ def main_loop(output, checkpoint=None, seed=None, device='auto', track=None, del
         config_path = checkpoint.parent / 'config.json'
         config = json.loads(config_path.read_text()) if config_path.exists() else {}
         if 'rlpd' in config:  # RLPD run folder
-            policy = load_rlpd(checkpoint, config)
+            policy = load_rlpd(checkpoint, config, no_normalization=no_normalization)
         else:
             from agents.dagger_actor import ActorPolicy
             policy = ActorPolicy.load(checkpoint, device=device)
+        if no_normalization:
+            # Identity statistics bypass scaling while retaining observation encoding.
+            policy.normalizer.mean = np.zeros(policy.encoder.output_size)
+            policy.normalizer.scale = np.ones(policy.encoder.output_size)
+            print('Observation normalization disabled for this run', flush=True)
         if config:
             track = config['train_tracks'][0] if 'train_tracks' in config else config['track']
             step_size, max_steps = config['step_size'], config['max_steps']
@@ -160,6 +173,8 @@ if __name__ == "__main__":
     parser.add_argument("--track", help="Override the experiment track, e.g. minigolf")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--device", choices=['auto', 'cpu', 'mps'], default='auto')
+    parser.add_argument("--no-normalization", action='store_true',
+                        help="Feed encoded observations without scaling (checkpoint test only)")
     parser.add_argument("--epsilon", type=float, default=0.0, help="Random-policy probability per block")
     parser.add_argument("--hold-steps", type=int, default=1, help="Steps per policy-selection block")
     parser.add_argument("--delay", type=float, default=0, help="Seconds to pause per step; 0.1 is about real speed")

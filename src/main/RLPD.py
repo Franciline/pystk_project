@@ -20,6 +20,8 @@ from utils.dagger_evaluation import evaluate_policy, is_improvement, append_metr
 from utils.observation_encoder import ObservationEncoder
 from utils.observation_normalizer import ObservationNormalizer
 from utils.rlpd_dataset import load_episodes, drop_duplicates, build_offline_buffer
+from utils.dataset_recorder import DatasetRecorder
+from utils.multitrack import train_tracks, next_track, evaluate_tracks
 
 CONFIG_PATH = Path(__file__).with_name('rlpd_config.yaml')
 FIELDS = ('obs', 'action', 'reward', 'next_obs', 'terminated')
@@ -49,13 +51,24 @@ def run_rlpd(config):
     with (output_dir / 'config.json').open('x') as f:  # refuse to mix two runs in one folder
         json.dump(config, f, indent=2)
 
-    # --- offline expert buffer; normalizer fitted once on it, then frozen (like DAgger) ---
+    tracks = train_tracks(config)
+    # Raw encoded inputs by default; optional fitted normalization is explicit.
     print('Building offline buffer...', flush=True)
-    episodes = drop_duplicates(load_episodes(agents=config['offline']['agents'],
+    dataset = Path(config['offline'].get('dataset','datasets/rlpd'))
+    if not dataset.is_absolute():
+        dataset = Path(__file__).resolve().parents[2]/dataset
+    episodes = drop_duplicates(load_episodes(root=dataset,agents=config['offline']['agents'],
                                              epsilons=config['offline']['epsilons'],
-                                             tracks=[config['track']]))
+                                             tracks=tracks))
+    missing = set(tracks)-{e['metadata']['track'] for e in episodes}
+    if missing:
+        raise ValueError(f'Missing offline data for tracks: {sorted(missing)}; collect it first')
+    append_metrics(output_dir/'offline_summary.csv',[dict(track=track,
+        episodes=sum(e['metadata']['track']==track for e in episodes),
+        transitions=sum(len(e['actions']) for e in episodes if e['metadata']['track']==track)) for track in tracks])
     encoder = ObservationEncoder(config['encoder']['num_paths'], config['encoder']['num_items'])
-    normalizer = ObservationNormalizer(encoder).fit(o for e in episodes for o in e['observations'][:-1])
+    normalizer = (ObservationNormalizer(encoder).fit(o for e in episodes for o in e['observations'][:-1])
+                  if config.get('normalize_observations',False) else ObservationNormalizer.identity(encoder))
     normalizer.save(output_dir / 'normalizer.npz')
     offline = build_offline_buffer(episodes, encoder, normalizer, config['learned_actions'])
     del episodes                                   # free the raw dicts
@@ -84,18 +97,34 @@ def run_rlpd(config):
     def encode(raw_obs):
         return normalizer.transform(encoder.encode(raw_obs))
 
-    env = STKRaceEnv(agent=AgentSpec(rank_start=0, use_ai=False), track=config['track'],
+    if config.get('expert_benchmark'):
+        from main.benchmark_expert import run_benchmark
+        benchmark=config['expert_benchmark']
+        run_benchmark(config,output_dir/'expert_benchmark',
+                      list(range(benchmark['seed_start'],benchmark['seed_start']+benchmark['runs'])))
+    env = STKRaceEnv(agent=AgentSpec(rank_start=0, use_ai=False), track=tracks[0],
                      num_kart=1, laps=1, step_size=config['step_size'])
     env_step, episode, next_eval, best = 0, 0, config['eval_every'], None
+    map_steps = {track:0 for track in tracks}
     start = time.time()
     try:
         while env_step < config['total_env_steps']:
             episode_seed = config['online_seed_start'] + episode
-            obs = encode(env.reset(seed=episode_seed)[0])
-            episode_return, logs = 0.0, {}
+            track = next_track(tracks,map_steps)
+            env.default_track = track
+            raw_obs = env.reset(seed=episode_seed)[0]
+            recorder = DatasetRecorder(env,config.get('diagnostics'),expert_labels=False)
+            recorder.start_episode(raw_obs,metadata=dict(track=track,seed=episode_seed,
+                agent='rlpd',step_size=config['step_size'],laps=1,num_kart=1,role='online_training'))
+            obs = encode(raw_obs)
+            episode_return, logs = 0.0, dict(critic_loss=None,actor_loss=None,
+                temperature=float(agent.log_alpha.exp().item()))
             for step in range(max_steps):
                 action = agent.act(obs)            # random sample: exploration
-                raw_next, reward, terminated, _, _ = env.step(vector_to_action(action, agent.learned))
+                executed = to_action(vector_to_action(action,agent.learned))
+                raw_next, reward, terminated, truncated, _ = env.step(executed)
+                truncated = bool(truncated or (step+1==max_steps and not terminated))
+                recorder.record_step(executed,reward,raw_next,terminated,truncated)
                 next_obs = encode(raw_next)
                 for key, value in zip(FIELDS, (obs, action, reward, next_obs, float(terminated))):
                     online[key][count] = value
@@ -104,14 +133,17 @@ def run_rlpd(config):
                 obs = next_obs
                 if count >= half:                  # train once online data can fill half a batch
                     logs = agent.update([minibatch() for _ in range(cfg['utd_ratio'])])
-                if terminated:
+                if terminated or truncated:
                     break
 
-            row = {'episode': episode, 'seed': episode_seed, 'env_steps': env_step,
+            map_steps[track] += step+1
+            diagnostic_summary = recorder.diagnostics.summary() if recorder.diagnostics else {}
+            recorder.save_episode(output_dir/'online_trajectories'/f'episode_{episode+1}.pkl.gz')
+            row = {'episode': episode, 'seed': episode_seed, 'track': track,'env_steps': env_step,
                    'n_steps': step + 1, 'finished': bool(terminated),
-                   'return': round(episode_return, 2), **logs}
+                   'return': round(episode_return, 2), 'truncated':truncated,**diagnostic_summary,**logs}
             append_metrics(output_dir / 'online_episodes.csv', [row])
-            print(f"Episode {episode}: {'finished' if terminated else 'timeout'} in {step + 1} steps, "
+            print(f"Episode {episode} ({track}): {'finished' if terminated else 'timeout'} in {step + 1} steps, "
                   f"return={episode_return:.1f}, env_steps={env_step}, {time.time() - start:.0f}s", flush=True)
             episode += 1
 
@@ -119,7 +151,10 @@ def run_rlpd(config):
             if env_step >= next_eval or env_step >= config['total_env_steps']:
                 next_eval += config['eval_every']
                 ev = config['evaluation']
-                rows, summary = evaluate_policy(env, agent, ev['seeds'], max_steps, to_action)
+                rows,map_summaries,summary = evaluate_tracks(env,agent,config,
+                    output_dir/'evaluation_episodes'/f'steps_{env_step}',to_action)
+                append_metrics(output_dir/'evaluation_by_track.csv',
+                    [dict(env_steps=env_step,**s) for s in map_summaries])
                 improved = is_improvement(summary, best, ev['min_steps_improvement'])
                 append_metrics(output_dir / 'evaluation_episodes.csv',
                                [dict(env_steps=env_step, **r) for r in rows])
@@ -132,7 +167,9 @@ def run_rlpd(config):
                     best = summary
                     agent.save(output_dir / 'agent_best.pt')
                     with (output_dir / 'best_evaluation.json').open('w') as f:
-                        json.dump(dict(env_steps=env_step, **summary), f, indent=2)
+                        json.dump(dict(env_steps=env_step,selection_tracks=tracks,
+                            selection_rule='Train-map completion, then macro finishing steps; unseen excluded',
+                            **summary),f,indent=2)
     finally:
         env.close()
 
@@ -140,7 +177,9 @@ def run_rlpd(config):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, default=CONFIG_PATH)
+    parser.add_argument('--experiment',type=Path,help='Shared multi-map overrides')
     args, overrides = parser.parse_known_args()
     # key=value overrides on the command line, e.g. total_env_steps=2000
-    config = OmegaConf.merge(OmegaConf.load(args.config), OmegaConf.from_dotlist(overrides))
+    config = OmegaConf.merge(OmegaConf.load(args.config),
+        OmegaConf.load(args.experiment) if args.experiment else {},OmegaConf.from_dotlist(overrides))
     run_rlpd(OmegaConf.to_container(config, resolve=True))

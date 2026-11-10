@@ -21,7 +21,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from agents.team4.agent4 import Agent4
 from pystk2_gymnasium.envs import STKRaceEnv, AgentSpec
 from utils.dataset_recorder import DatasetRecorder
+from utils.episode_deduplication import drop_duplicates
 from utils.dagger_evaluation import evaluate_policy, append_metrics, is_improvement
+from utils.multitrack import train_tracks, next_track, evaluate_tracks
 
 CONFIG_PATH = Path(__file__).with_name('dagger_config.yaml')
 BUTTONS = ('brake', 'drift', 'fire', 'nitro', 'rescue')
@@ -44,7 +46,7 @@ def to_action(action):
 
 def collect_episode(env, learner, *, beta, seed, max_steps, output, iteration, step_size, epsilon=0.0,
                     exploration_mode='random', acceleration_std=0.05, steer_std=0.1,
-                    gaussian_probability=1.0):
+                    gaussian_probability=1.0, diagnostics=None):
     """Query expert at every visited state; select which policy controls each step."""
     if not 0 <= beta <= 1 or max_steps < 1:
         raise ValueError('Require beta in [0, 1] and max_steps >= 1')
@@ -67,7 +69,7 @@ def collect_episode(env, learner, *, beta, seed, max_steps, output, iteration, s
         learner.reset_episode()
 
     rng = np.random.default_rng(seed)
-    recorder = DatasetRecorder()
+    recorder = DatasetRecorder(env, diagnostics)
 
     recorder.start_episode(obs, metadata={
         'agent': 'team4', 'track': env.current_track, 'seed': seed,
@@ -121,6 +123,8 @@ def collect_episode(env, learner, *, beta, seed, max_steps, output, iteration, s
         'exploration_mode': exploration_mode,
         'lap_time': (step + 1) * step_size if terminated else None,
     }
+    if recorder.diagnostics is not None:
+        metrics.update(recorder.diagnostics.summary())
     recorder.episode['metadata'].update(metrics)
     recorder.save_episode(output)
     return metrics
@@ -132,21 +136,35 @@ def load_initial_episodes(env, source, destination, track):
     Missing labels are reconstructed sequentially with a fresh Team4 per episode.
     The original offline files are never modified.
     """
-    paths = []
+    episodes = []
     for original in sorted(Path(source).rglob('*.pkl.gz')):
         with gzip.open(original, 'rb') as file:
             episode = pickle.load(file)
-        if episode['metadata']['track'] != track:
+        if episode['metadata']['track'] not in ([track] if isinstance(track,str) else track):
             continue
         if episode['metadata'].get('agent') not in ('team4', 'The Winners'):
             continue
-        if 'expert_actions' not in episode:
+        episode['metadata']['source_file'] = str(original.resolve())
+        episodes.append(episode)
+    expected = {track} if isinstance(track,str) else set(track)
+    missing = expected-{e['metadata']['track'] for e in episodes}
+    if missing:
+        raise ValueError(f'Missing Team4 offline data for tracks: {sorted(missing)}')
+    unique = drop_duplicates(episodes)
+    append_metrics(destination.parent/'offline_summary.csv', [dict(track=name,
+        episodes=sum(e['metadata']['track']==name for e in unique),
+        transitions=sum(len(e['actions']) for e in unique if e['metadata']['track']==name))
+        for name in sorted(expected)])
+    print(f'Offline deduplication: {len(episodes)} -> {len(unique)} episodes; '
+          f"{sum(len(e['actions']) for e in unique)} transitions retained", flush=True)
+    paths = []
+    for episode in unique:
+        if 'expert_actions' not in episode or any(a is None for a in episode['expert_actions']):
             expert = Agent4(env, path_lookahead=3)
             episode['expert_actions'] = [expert.choose_action(deepcopy(obs))
                                          for obs in episode['observations'][:-1]]
         episode['expert_actions'] = [to_action(a) for a in episode['expert_actions']]
         # Preserve historical executed actions: they produced the recorded transitions.
-        episode['metadata']['source_file'] = str(original.resolve())
         path = destination / f'episode_{len(paths) + 1}.pkl.gz'
         path.parent.mkdir(parents=True, exist_ok=True)
         with gzip.open(path, 'xb') as file:
@@ -168,7 +186,8 @@ def run_dagger(config, *, learner=None, train_policy=None):
     output_dir.mkdir(parents=True, exist_ok=True)
     with (output_dir / 'config.json').open('x') as file:
         json.dump(config, file, indent=2)
-    track, max_steps = config['track'], config['max_steps']
+    tracks, max_steps = train_tracks(config), config['max_steps']
+    track = tracks[0]
     initial = config['initialization']
     evaluation = config['evaluation']
     best, paths = None, []
@@ -184,11 +203,12 @@ def run_dagger(config, *, learner=None, train_policy=None):
     try:
         for iteration in range(1, config['N'] + 1):
             round_steps = 0
+            map_steps = {track:0 for track in tracks}
             if iteration == 1 and initial['mode'] == 'load_offline':
                 source = Path(initial['dataset'])
                 if not source.is_absolute():
                     source = root / source
-                paths = load_initial_episodes(env, source, output_dir / 'iteration_1', track)
+                paths = load_initial_episodes(env, source, output_dir / 'iteration_1', tracks)
                 for path in paths:
                     with gzip.open(path, 'rb') as file:
                         initial_steps += len(pickle.load(file)['actions'])
@@ -197,10 +217,16 @@ def run_dagger(config, *, learner=None, train_policy=None):
                     epsilons = ([0.0] if initial['mode'] == 'single_expert' else
                                 [epsilon for epsilon in initial['epsilons']
                                  for _ in range(initial['episodes_per_epsilon'])])
+                    initial_schedule = [(track,epsilon) for track in tracks for epsilon in epsilons]
                 episode = 0
-                while (episode < len(epsilons) if iteration == 1 else
+                while (episode < len(initial_schedule) if iteration == 1 else
                        round_steps < config['steps_per_iteration']):
-                    epsilon = epsilons[episode] if iteration == 1 else config['online_epsilon']
+                    if iteration == 1:
+                        track,epsilon = initial_schedule[episode]
+                    else:
+                        track = next_track(tracks,map_steps)
+                        epsilon = config['online_epsilon']
+                    env.default_track = track
                     episode_seed = config['online_seed_start'] + episode_index
                     episode_index += 1
                     episode += 1
@@ -214,9 +240,11 @@ def run_dagger(config, *, learner=None, train_policy=None):
                         exploration_mode=exploration.get('mode', 'random'),
                         acceleration_std=exploration.get('acceleration_std', 0.05),
                         steer_std=exploration.get('steer_std', 0.1),
-                        gaussian_probability=exploration.get('probability', 1.0))
+                        gaussian_probability=exploration.get('probability', 1.0),
+                        diagnostics=config.get('diagnostics'))
                     paths.append(path)
                     round_steps += metrics['n_steps']
+                    map_steps[track] += metrics['n_steps']
                     if iteration == 1:
                         initial_steps += metrics['n_steps']
                     else:
@@ -230,12 +258,15 @@ def run_dagger(config, *, learner=None, train_policy=None):
             train_policy(learner, tuple(paths), iteration)
             checkpoint = output_dir / f'actor_iteration_{iteration}.pt'
             shutil.copyfile(checkpoint, output_dir / 'actor_last.pt')
-            rows, summary = evaluate_policy(env, learner, evaluation['seeds'], max_steps, to_action)
+            rows, map_summaries, summary = evaluate_tracks(env,learner,config,
+                output_dir/'evaluation_episodes'/f'iteration_{iteration}',to_action)
+            append_metrics(output_dir/'evaluation_by_track.csv',
+                [dict(iteration=iteration,online_steps=online_steps,**s) for s in map_summaries])
             improved = is_improvement(summary, best, evaluation['min_steps_improvement'])
             append_metrics(output_dir / 'evaluation_episodes.csv',
-                           [dict(iteration=iteration, track=track, **row) for row in rows])
+                           [dict(iteration=iteration, **row) for row in rows])
             append_metrics(output_dir / 'evaluation.csv', [dict(
-                iteration=iteration, track=track, initial_steps=initial_steps,
+                iteration=iteration, track=tracks[0] if len(tracks)==1 else '__train_mean__', initial_steps=initial_steps,
                 online_steps=online_steps, training_steps=initial_steps + online_steps,
                 **summary, improved=improved)])
             print(f'Evaluation {iteration}: completion={summary["completion_rate"]:.0%}, '
@@ -244,7 +275,9 @@ def run_dagger(config, *, learner=None, train_policy=None):
                 best = summary
                 shutil.copyfile(checkpoint, output_dir / 'actor_best.pt')
                 with (output_dir / 'best_evaluation.json').open('w') as file:
-                    json.dump(dict(iteration=iteration, online_steps=online_steps, **summary), file, indent=2)
+                    json.dump(dict(iteration=iteration,online_steps=online_steps,
+                        selection_tracks=tracks,selection_rule='Train-map completion, then macro finishing steps; unseen excluded',
+                        **summary),file,indent=2)
     finally:
         env.close()
     return paths
@@ -253,9 +286,12 @@ def run_dagger(config, *, learner=None, train_policy=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, default=CONFIG_PATH)
+    parser.add_argument('--experiment',type=Path,help='Shared multi-map overrides')
     args, overrides = parser.parse_known_args()
     config = OmegaConf.to_container(OmegaConf.merge(
-        OmegaConf.load(args.config), OmegaConf.from_dotlist(overrides)), resolve=True)
+        OmegaConf.load(args.config),
+        OmegaConf.load(args.experiment) if args.experiment else {},
+        OmegaConf.from_dotlist(overrides)), resolve=True)
     from agents.dagger_actor import ActorPolicy, train_policy
     output_dir = Path(config['output_dir'])
     if not output_dir.is_absolute():

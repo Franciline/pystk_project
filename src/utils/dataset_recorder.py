@@ -7,8 +7,12 @@ import pickle
 
 
 class DatasetRecorder:
-    def __init__(self):
+    def __init__(self, env=None, diagnostic_config=None, expert_labels=True):
         self.episode = None
+        self.env = env
+        self.diagnostic_config = diagnostic_config
+        self.expert_labels = expert_labels
+        self.diagnostics = None
 
     def start_episode(self, observation, metadata=None):
         """Start after reset(); do not discard an unsaved episode."""
@@ -23,6 +27,13 @@ class DatasetRecorder:
             "truncated": [],
             "metadata": deepcopy(metadata) if metadata is not None else {},
         }
+
+        if self.env is not None and (self.diagnostic_config or {}).get('enabled', True):
+            from utils.episode_diagnostics import EpisodeDiagnostics
+            self.diagnostics = EpisodeDiagnostics(self.env, self.diagnostic_config)
+            self.episode['diagnostics'] = self.diagnostics.rows
+            self.episode['metadata']['diagnostic_settings'] = dict(self.diagnostic_config or {})
+        self.episode['metadata']['expert_labels_available'] = self.expert_labels
 
     def record_step(self, action, reward, next_observation, terminated, truncated,
                     expert_action=None):
@@ -41,13 +52,16 @@ class DatasetRecorder:
         values = {
             "observations": deepcopy(next_observation),
             "actions": deepcopy(action),
-            "expert_actions": deepcopy(action if expert_action is None else expert_action),
+            "expert_actions": deepcopy(action if expert_action is None else expert_action) if self.expert_labels else None,
             "rewards": float(reward),
             "terminated": bool(terminated),
             "truncated": bool(truncated),
         }
         for key, value in values.items():
             episode[key].append(value)
+        if self.diagnostics is not None:
+            self.diagnostics.capture()
+            episode["diagnostic_summary"] = self.diagnostics.summary()
 
     def save_episode(self, path):
         """Save a completed episode as gzip-compressed pickle; refuse overwrites.

@@ -10,6 +10,14 @@ class ObservationNormalizer:
         self.mean = None
         self.scale = None
 
+    @classmethod
+    def identity(cls, encoder):
+        """Keep checkpoint compatibility while passing encoded inputs unchanged."""
+        result = cls(encoder)
+        result.mean = np.zeros(encoder.output_size)
+        result.scale = np.ones(encoder.output_size)
+        return result
+
     def fit(self, observations):
         """Consume raw training observations once; use per-feature population std.
 

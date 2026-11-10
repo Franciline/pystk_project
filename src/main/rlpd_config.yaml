@@ -1,3 +1,4 @@
+normalize_observations: false  # Raw encoded inputs; no fitted normalization.
 track: abyss
 step_size: 0.1
 max_steps: 1000 # timeout per episode
@@ -15,6 +16,9 @@ evaluation:
 
 # offline expert data 
 offline:
+  dataset: datasets/rlpd_offline_data
+  episodes_per_epsilon: 3
+  seed_start: 0
   agents: [team4]
   epsilons: [0.0, 0.1, 0.3]
 
@@ -39,3 +43,9 @@ rlpd:
   temperature_lr: 0.0003
   init_temperature: 0.1
   device: auto           # mps if available, else cpu
+# Additive world diagnostics; these are never actor inputs.
+diagnostics:
+  enabled: true
+  stuck_seconds: 5
+  stuck_radius_m: 1
+  save_evaluation_episodes: true

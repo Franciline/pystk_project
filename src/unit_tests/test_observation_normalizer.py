@@ -20,6 +20,7 @@ def test_normalizer():
     b['items_position'] = []
     normalizer = ObservationNormalizer(encoder).fit(iter([a, b]))
     va, vb = encoder.encode(a), encoder.encode(b)
+    np.testing.assert_array_equal(ObservationNormalizer.identity(encoder).transform(va),va)
     na, nb = normalizer.transform(va), normalizer.transform(vb)
     np.testing.assert_allclose(na[:3], -1)
     np.testing.assert_allclose(nb[:3], 1)

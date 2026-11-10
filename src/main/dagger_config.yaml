@@ -11,8 +11,8 @@ online_epsilon: 0.1  # Used only when exploration.mode=random.
 exploration:
   mode: gaussian  # gaussian or random
   probability: 1.0  # Gaussian perturbation probability per step.
-  acceleration_std: 0.05
-  steer_std: 0.1
+  acceleration_std: 0.1
+  steer_std: 0.05
 output_dir: datasets/protocol/dagger_seed1000
 
 initialization:
@@ -39,3 +39,16 @@ evaluation:
 expert_benchmark:
   runs: 5
   seed_start: 10000
+
+# Separate checkpoint generalization test; does not affect training/evaluation.
+comparison:
+  tracks: [abyss, snowtuxpeak]
+  seeds: [20000, 20001, 20002, 20003, 20004]
+  output_dir: datasets/protocol/comparison
+
+# Additive world diagnostics; these are never actor inputs.
+diagnostics:
+  enabled: true
+  stuck_seconds: 5
+  stuck_radius_m: 1
+  save_evaluation_episodes: true

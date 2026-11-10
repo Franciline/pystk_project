@@ -5,7 +5,8 @@ import random
 import numpy as np
 
 
-def evaluate_policy(env, learner, seeds, max_steps, to_action, policy_factory=None):
+def evaluate_policy(env, learner, seeds, max_steps, to_action, policy_factory=None,
+                    diagnostics=None, record_dir=None):
     if not seeds or max_steps < 1:
         raise ValueError('Evaluation needs seeds and a positive step limit')
     rows = []
@@ -19,14 +20,25 @@ def evaluate_policy(env, learner, seeds, max_steps, to_action, policy_factory=No
             policy = policy_factory(env) if policy_factory is not None else learner
             if hasattr(policy, 'reset_episode'):
                 policy.reset_episode()
+            recorder = None
+            if diagnostics and diagnostics.get('enabled', True):
+                from utils.dataset_recorder import DatasetRecorder
+                recorder = DatasetRecorder(env, diagnostics, expert_labels=False)
+                recorder.start_episode(obs, metadata=dict(track=env.current_track,seed=seed,
+                    step_size=env.step_size,role='evaluation',laps=1,num_kart=1))
             for step in range(max_steps):
                 action = to_action(policy.choose_action(obs))
-                obs, _, terminated, truncated, _ = env.step(action)
+                obs, reward, terminated, truncated, _ = env.step(action)
                 truncated = bool(truncated or (step + 1 == max_steps and not terminated))
+                if recorder is not None:
+                    recorder.record_step(action,reward,obs,terminated,truncated)
                 if terminated or truncated:
                     break
             rows.append({'seed': seed, 'n_steps': step + 1,
-                         'terminated': bool(terminated), 'truncated': truncated})
+                         'terminated': bool(terminated), 'truncated': truncated,
+                         **(recorder.diagnostics.summary() if recorder is not None else {})})
+            if recorder is not None and record_dir is not None:
+                recorder.save_episode(Path(record_dir)/f'seed_{seed}.pkl.gz')
     finally:
         random.setstate(python_state)
         np.random.set_state(numpy_state)
@@ -41,6 +53,12 @@ def evaluate_policy(env, learner, seeds, max_steps, to_action, policy_factory=No
         'finish_steps_mean': float(np.mean(finished)) if finished else None,
         'finish_steps_std': float(np.std(finished, ddof=1)) if len(finished) > 1 else None,
     }
+    if diagnostics and diagnostics.get('enabled', True):
+        for key in ('rescue_count','stuck_count','stuck_duration_s'):
+            values = [r[key] for r in rows if r[key] is not None]
+            # Missing simulator support is unknown, not a zero-event episode.
+            summary[key+'_mean'] = float(np.mean(values)) if len(values)==len(rows) else None
+            summary[key+'_std'] = float(np.std(values,ddof=1)) if len(values)==len(rows)>1 else None
     return rows, summary
 
 
@@ -57,6 +75,7 @@ def is_improvement(current, best, min_steps):
 
 def append_metrics(path, rows):
     path = Path(path)
+    path.parent.mkdir(parents=True,exist_ok=True)
     new = not path.exists()
     with path.open('a', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=list(rows[0]))

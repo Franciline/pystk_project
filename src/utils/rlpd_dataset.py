@@ -5,6 +5,7 @@ import gzip
 from pathlib import Path
 import pickle
 from agents.rlpd_agent import action_to_vector
+from utils.episode_deduplication import drop_duplicates
 
 DATASET_DIR = Path(__file__).resolve().parents[2] / "datasets" / "rlpd"
 
@@ -47,18 +48,6 @@ def to_transitions(episodes):
         columns["episode_id"] += [episode_id(episode["metadata"])] * n
         columns["step_id"] += list(range(n))
     return columns
-
-def drop_duplicates(episodes):
-    """keep the first of each group of identical episodes (same actions, rewards, progress)"""
-    seen, unique = set(), []
-    for episode in episodes:
-        # progress along the track at each step: catches same actions but different outcome
-        progress = [float(np.ravel(obs["distance_down_track"])[0]) for obs in episode["observations"]]
-        key = pickle.dumps((episode["actions"], episode["rewards"], progress))
-        if key not in seen:  # first time we see this exact episode
-            seen.add(key)
-            unique.append(episode)
-    return unique
 
 def build_offline_buffer(episodes, encoder, normalizer, learned):
     """encode episodes into float32 arrays: obs, action, reward, next_obs, terminated.

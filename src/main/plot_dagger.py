@@ -108,83 +108,183 @@ def plot_results(experiment, output_dir=None):
     return saved
 
 
-def plot_relative_comparison(protocol, seeds, output_dir=None):
-    """Compare seed means on a shared online-step grid; carry latest eval forward.
+def plot_relative_comparison(protocol, seeds, output_dir=None, relative=True):
+    """Validation learning curves for each method's validation-selected best run.
 
-    Bands are sample std across training seeds, not across evaluation episodes.
-    Each run uses its own saved expert mean as a fixed denominator.
+    Bands use episode std / fixed expert mean, not training-seed variation.
     """
+    protocol = Path(protocol)
+    output = Path(output_dir) if output_dir is not None else protocol.parent / 'plots'
+    output.mkdir(parents=True, exist_ok=True)
+    selected = {}
+    for method in ('dagger_offline_gaussian', 'rlpd'):
+        candidates = []
+        for seed in seeds:
+            folder = protocol / f'{method}_seed{seed}'
+            best = json.loads((folder / 'best_evaluation.json').read_text())
+            candidates.append(((-best['completion_rate'],
+                best['finish_steps_mean'] if best['finish_steps_mean'] is not None else np.inf,
+                seed), folder))
+        selected[method] = min(candidates)[1]
+    dagger = selected['dagger_offline_gaussian']
+    config = json.loads((dagger / 'config.json').read_text())
+    expert = pd.read_csv(dagger / 'expert_benchmark' / 'summary.csv')
+    reference = float(expert.loc[expert['track'] == config['track'], 'finish_steps_mean'].iloc[0])
+    plt.style.use('seaborn-v0_8-darkgrid')
+    plt.rcParams.update({'svg.fonttype': 'none', 'pdf.fonttype': 42})
+    fig, ax = plt.subplots(figsize=(14, 3.8) if not relative else (11, 4.8))
+    scale = reference if relative else 1.0
+    stem = 'relative_steps_comparison' if relative else 'finishing_steps_comparison'
+    title = 'Relative finishing steps' if relative else 'Finishing steps'
+    ax.axhline(reference / scale, color='#333333', linestyle='--', linewidth=1.5, label='Expert (team4)')
+    summaries = []
+    for method, label, color in [('dagger_offline_gaussian','DAgger','#4C72B0'),
+                                  ('rlpd','RLPD','#DD8452')]:
+        folder = selected[method]
+        settings = json.loads((folder / 'config.json').read_text())
+        if any(settings[k] != config[k] for k in ('track','step_size','max_steps')) or settings['evaluation']['seeds'] != config['evaluation']['seeds']:
+            raise ValueError('Comparison requires matching task and evaluation seeds')
+        rows = pd.read_csv(folder / 'evaluation.csv')
+        column = 'online_steps' if 'online_steps' in rows else 'env_steps'
+        rows = rows.sort_values(column)
+        x = rows[column].to_numpy(dtype=float)
+        y = rows['finish_steps_mean'].to_numpy(dtype=float) / scale
+        std = rows['finish_steps_std'].to_numpy(dtype=float) / scale
+        ax.plot(x, y, marker='o', markersize=4, color=color, label=label)
+        ax.fill_between(x, y - std, y + std, color=color, alpha=.15)
+        for i, (_, row) in enumerate(rows.iterrows()):
+            summaries.append(dict(method=label, source=str(folder), online_steps=x[i],
+                mean_steps=row['finish_steps_mean'], std_steps=row['finish_steps_std'],
+                relative_steps=row['finish_steps_mean'] / reference,
+                relative_std=row['finish_steps_std'] / reference, expert_mean_steps=reference,
+                completion_rate=row['completion_rate']))
+    ax.set(xlabel='Online collection steps', ylabel=title, title=title)
+    ax.legend(frameon=False)
+    fig.tight_layout()
+    for suffix in ('pdf','svg'):
+        path = output / f'{stem}.{suffix}'
+        fig.savefig(path, bbox_inches='tight')
+        print(path)
+    plt.close(fig)
+    pd.DataFrame(summaries).to_csv(output / f'{stem}.csv', index=False)
+    return output / f'{stem}.pdf'
+
+
+def plot_initialization_details(protocol, seeds, output_dir=None):
+    """All training-seed histories, then paired evaluation of selected best actors."""
     protocol = Path(protocol)
     output = Path(output_dir) if output_dir is not None else protocol / 'plots'
     output.mkdir(parents=True, exist_ok=True)
-    methods = {'dagger': 'DAgger — generated initialization',
-               'dagger_offline': 'DAgger — loaded offline initialization'}
-    runs = {}
-    task = None
-    for method in methods:
-        runs[method] = []
+    methods = [('dagger', 'Generated: 9 episodes'),
+               ('dagger_offline', 'Loaded offline data')]
+    colors = ['tab:blue', 'tab:orange']
+    metrics = [('completion_rate', 'Completion rate'),
+               ('steps_mean', 'Steps — all evaluation episodes'),
+               ('finish_steps_mean', 'Steps — completed episodes')]
+    for seed in seeds:
+        fig, axes = plt.subplots(1, 3, figsize=(16, 4.8))
+        for (method, label), color in zip(methods, colors):
+            rows = pd.read_csv(protocol / f'{method}_seed{seed}' / 'evaluation.csv').sort_values('online_steps')
+            for ax, (metric, ylabel) in zip(axes, metrics):
+                ax.plot(rows['online_steps'], rows[metric], color=color, marker='.', label=label)
+                std = {'steps_mean': 'steps_std', 'finish_steps_mean': 'finish_steps_std'}.get(metric)
+                if std is not None:
+                    x = rows['online_steps'].to_numpy()
+                    y = rows[metric].to_numpy(dtype=float)
+                    spread = rows[std].to_numpy(dtype=float)
+                    ax.fill_between(x, y - spread, y + spread, color=color, alpha=.15)
+                ax.set(xlabel='Online collection steps', ylabel=ylabel)
+                ax.grid(alpha=.2)
+                ax.legend(fontsize=8)
+        axes[0].set_ylim(-.05, 1.05)
+        fig.suptitle(f'Initialization comparison — training seed {seed}; bands: evaluation episode std')
+        fig.tight_layout()
+        path = output / f'initialization_seed{seed}.png'
+        fig.savefig(path, dpi=180, bbox_inches='tight')
+        fig.savefig(path.with_suffix('.svg'), bbox_inches='tight')
+        plt.close(fig)
+        print(path)
+
+    winners = []
+    rows_out = []
+    for (method, label), color in zip(methods, colors):
+        candidates = []
         for seed in seeds:
             folder = protocol / f'{method}_seed{seed}'
-            config = json.loads((folder / 'config.json').read_text())
-            current = (config['track'], config['max_steps'], config['step_size'],
-                       tuple(config['evaluation']['seeds']))
-            if task is not None and current != task:
-                raise ValueError('Comparison requires matching task and evaluation conditions')
-            task = current
-            rows = pd.read_csv(folder / 'evaluation.csv').sort_values('online_steps')
-            expert = pd.read_csv(folder / 'expert_benchmark' / 'summary.csv')
-            reference = float(expert.loc[expert['track'] == config['track'], 'finish_steps_mean'].iloc[0])
-            if not np.isfinite(reference) or reference <= 0:
-                raise ValueError(f'No successful expert baseline: {folder}')
-            rows['ratio'] = rows['finish_steps_mean'] / reference
-            runs[method].append(rows)
-    end = min(float(r['online_steps'].max()) for rows in runs.values() for r in rows)
-    grid = np.unique(np.r_[np.arange(0, end + 1, 5000), end])
-    fig, ax = plt.subplots(figsize=(9, 5))
-    summaries = []
-    for method, label in methods.items():
-        values, completion = [], []
-        for rows in runs[method]:
-            indices = np.searchsorted(rows['online_steps'].to_numpy(), grid, side='right') - 1
-            if np.any(indices < 0):
-                raise ValueError('Each run needs an initialization evaluation at zero online steps')
-            values.append(rows['ratio'].to_numpy()[indices])
-            completion.append(rows['completion_rate'].to_numpy()[indices])
-        values = np.stack(values)
-        mean = values.mean(axis=0)
-        std = values.std(axis=0, ddof=1) if len(seeds) > 1 else np.full(len(grid), np.nan)
-        line, = ax.plot(grid, mean, marker='o', label=f'{label} (n={len(seeds)})')
-        ax.fill_between(grid, mean - std, mean + std, color=line.get_color(), alpha=.18)
-        for i, step in enumerate(grid):
-            summaries.append(dict(method=method, online_steps=step, ratio_mean=mean[i],
-                                  ratio_std=std[i], completion_rate_mean=np.mean(completion, axis=0)[i]))
-    ax.axhline(1, color='black', linestyle='--', linewidth=1.3, label='Expert = 1')
-    ax.set(xlabel='Online collection steps (initial data excluded)',
-           ylabel='Actor / expert mean finishing steps',
-           title=f'Relative finishing steps — {task[0]} (lower is faster)')
-    ax.grid(alpha=.2)
-    ax.legend()
-    fig.text(.5, .015, 'Bands: ±1 sample std across training seeds. Latest evaluation carried forward. Successful laps only.',
-             ha='center', fontsize=9)
-    fig.tight_layout(rect=(0, .05, 1, 1))
-    path = output / 'relative_steps_comparison.png'
+            best = json.loads((folder / 'best_evaluation.json').read_text())
+            candidates.append((seed, folder, best))
+        seed, folder, best = min(candidates, key=lambda item: (
+            -item[2]['completion_rate'],
+            item[2]['finish_steps_mean'] if item[2]['finish_steps_mean'] is not None else np.inf,
+            item[0]))
+        final_path = folder / 'final_test_episodes.csv'
+        if not final_path.exists():
+            print(f'Best-actor final comparison skipped: run final_test.py on {folder} --checkpoints best --runs 20')
+            return
+        episodes = pd.read_csv(final_path)
+        episodes = episodes[episodes['checkpoint'] == 'best'].sort_values('seed')
+        if len(episodes) != 20 or episodes['seed'].nunique() != 20:
+            raise ValueError(f'Expected 20 distinct final-test seeds for {folder}')
+        completed = episodes['terminated'].astype(str).str.lower().eq('true')
+        successful = episodes.loc[completed, 'n_steps']
+        summary = dict(completion_rate=float(completed.mean()),
+                       steps_mean=float(episodes['n_steps'].mean()),
+                       steps_std=float(episodes['n_steps'].std()),
+                       finish_steps_mean=float(successful.mean()) if len(successful) else None,
+                       finish_steps_std=float(successful.std()) if len(successful) > 1 else None)
+        winners.append((label, color, seed, best, episodes))
+        rows_out.append(dict(method=method, training_seed=seed, source=str(folder),
+                             selected_iteration=best['iteration'], **summary))
+    reference_seeds = winners[0][-1]['seed'].tolist()
+    if any(w[-1]['seed'].tolist() != reference_seeds for w in winners):
+        raise ValueError('Best actors need matching evaluation seeds for paired comparison')
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.8))
+    x = np.arange(len(reference_seeds))
+    for label, color, seed, best, episodes in winners:
+        completed = episodes['terminated'].astype(str).str.lower().eq('true').astype(int)
+        axes[0].plot(x, completed, marker='o', color=color,
+                     label=f'{label}: {completed.mean():.0%}')
+        axes[1].plot(x, episodes['n_steps'], marker='o', color=color,
+                     label=f'{label} (training seed {seed}, iteration {best["iteration"]})')
+        mean_steps = episodes['n_steps'].mean()
+        std_steps = episodes['n_steps'].std(ddof=1)
+        axes[1].axhline(mean_steps, color=color, linestyle='--', alpha=.8,
+                        label=f'{label}: mean {mean_steps:.1f} ± std {std_steps:.1f}')
+        axes[1].axhspan(mean_steps - std_steps, mean_steps + std_steps,
+                       color=color, alpha=.12)
+    for ax in axes:
+        ax.set_xticks(x, [str(s) for s in reference_seeds], rotation=45)
+        ax.set_xlabel('Evaluation seed (paired episodes)')
+        ax.grid(alpha=.2)
+        ax.legend(fontsize=8)
+    axes[0].set(ylabel='Completed lap: 1=yes, 0=no', ylim=(-.05, 1.05))
+    axes[1].set_ylabel('Episode steps (timeouts included)')
+    fig.suptitle('Selected best actors — 20 held-out seeds; dashed mean, shaded ±1 episode std')
+    fig.tight_layout()
+    path = output / 'initialization_best_actors.png'
     fig.savefig(path, dpi=180, bbox_inches='tight')
     fig.savefig(path.with_suffix('.svg'), bbox_inches='tight')
     plt.close(fig)
-    pd.DataFrame(summaries).to_csv(output / 'relative_steps_comparison.csv', index=False)
+    pd.DataFrame(rows_out).to_csv(output / 'initialization_best_actors.csv', index=False)
     print(path)
-    return path
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--experiment', type=Path, help='Directory containing evaluation.csv and losses.csv')
+    mode.add_argument('--steps-best', type=Path, help='Actual finishing steps for best Gaussian DAgger and RLPD runs')
+    mode.add_argument('--relative-best', type=Path, help='Relative curves for best Gaussian DAgger and RLPD runs')
     mode.add_argument('--compare-protocol', type=Path, help='Compare dagger_seed* and dagger_offline_seed* runs')
     parser.add_argument('--seeds', type=int, nargs='+', default=[1000, 2000, 3000])
     parser.add_argument('--output-dir', type=Path)
     args = parser.parse_args()
-    if args.compare_protocol is not None:
+    if args.steps_best is not None:
+        plot_relative_comparison(args.steps_best, args.seeds, args.output_dir, relative=False)
+    elif args.relative_best is not None:
+        plot_relative_comparison(args.relative_best, args.seeds, args.output_dir)
+    elif args.compare_protocol is not None:
         plot_relative_comparison(args.compare_protocol, args.seeds, args.output_dir)
+        plot_initialization_details(args.compare_protocol, args.seeds, args.output_dir)
     else:
         plot_results(args.experiment, args.output_dir)

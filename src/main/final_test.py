@@ -50,6 +50,8 @@ def test(env, out_dir, checkpoint, policy, seeds):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('run_dirs', type=Path, nargs='*')
+    parser.add_argument('--checkpoints', nargs='+', choices=['best', 'last'], default=['best', 'last'],
+                        help='Checkpoint types to test; use --checkpoints best for selected actors')
     parser.add_argument('--expert', action='store_true', help='also test team4 (only one of us runs it)')
     parser.add_argument('--seed-start', type=int, default=20000)
     parser.add_argument('--runs', type=int, default=20)
@@ -69,7 +71,7 @@ if __name__ == '__main__':
         if args.expert:
             test(env, EXPERT_DIR, 'team4', None, seeds)
         for run_dir in args.run_dirs:
-            for name in ('best', 'last'):
+            for name in args.checkpoints:
                 test(env, run_dir, name, load_policy(run_dir, name), seeds)
     finally:
         env.close()
