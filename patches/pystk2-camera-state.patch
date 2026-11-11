@@ -1,0 +1,22 @@
+--- a/pystk_cpp/state.cpp
++++ b/pystk_cpp/state.cpp
+@@ -564,11 +564,14 @@
+ 	
+ 	void update(int player_id) {
+ 		id = player_id;
+-		// if (!GUIEngine::isNoGraphics()) {
+-		// 	if (!camera)
+-		// 		camera.reset(new PyCamera());
+-		// 	camera->update(player_id);
+-		// }
++		if (player_id >= 0 && static_cast<unsigned int>(player_id) < Camera::getNumCameras()
++		    && Camera::getCamera(player_id)->getCameraSceneNode()) {
++			if (!camera)
++				camera.reset(new PyCamera());
++			camera->update(player_id);
++		} else {
++			camera.reset();
++		}
+ 	}
+ };
+ 

@@ -1,0 +1,51 @@
+--- a/pystk_cpp/state.cpp
++++ b/pystk_cpp/state.cpp
+@@ -8,6 +8,7 @@
+ #include "graphics/camera/camera.hpp"
+ #include "karts/skidding.hpp"
+ #include "karts/abstract_kart.hpp"
++#include "karts/abstract_kart_animation.hpp"
+ #include "karts/controller/controller.hpp"
+ #include "karts/controller/local_player_controller.hpp"
+ #include "karts/kart_properties.hpp"
+@@ -282,6 +283,7 @@
+ 	bool has_finished_race;
+ 	int node = 0;
+ 	bool is_on_road;
++	bool rescue_active = false;
+ 	
+ 	PyAttachment attachment;
+ 	
+@@ -321,6 +323,7 @@
+ 		  R(lives, "Lives in three strikes battle")
+ 		  R(node, "Closest node")
+ 		  R(is_on_road, "Whether the kart is on track")
++		  R(rescue_active, "True during a rescue animation; not a fall-cause flag")
+ #undef R
+ 		 .def("__repr__", [](const PyKart &k) { return "<Kart id=" + std::to_string(k.id)+" player_id=" + std::to_string(k.player_id)+" name='"+k.name+"' ...>"; });
+ 		add_pickle(c);
+@@ -349,6 +352,8 @@
+ 			shield_time = k->getShieldTime();
+ 			race_result = k->getRaceResult();
+ 			jumping = k->isJumping();
++			const auto *animation = k->getKartAnimation();
++			rescue_active = animation && animation->getAnimationType() == KAT_RESCUE;
+ 			position = k->getPosition();
+ 			energy = k->getEnergy();
+ 			attachment.update(k->getAttachment());
+@@ -805,6 +810,7 @@
+     pickle(s, o.has_finished_race);
+ 	pickle(s, o.node);
+ 	pickle(s, o.is_on_road);
++	pickle(s, o.rescue_active);
+ }
+ void unpickle(std::istream & s, PyKart * o) {
+     unpickle(s, &o->id);
+@@ -836,6 +842,7 @@
+     unpickle(s, &o->has_finished_race);
+     unpickle(s, &o->node);
+     unpickle(s, &o->is_on_road);
++    unpickle(s, &o->rescue_active);
+ }
+ void pickle(std::ostream & s, const PyItem & o) {
+     pickle(s, o.id);

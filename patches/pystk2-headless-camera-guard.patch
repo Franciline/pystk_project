@@ -1,0 +1,19 @@
+--- a/pystk_cpp/state.cpp
++++ b/pystk_cpp/state.cpp
+@@ -6,6 +6,7 @@
+ 
+ #include "config/stk_config.hpp"
+ #include "graphics/camera/camera.hpp"
++#include "guiengine/engine.hpp"
+ #include "karts/skidding.hpp"
+ #include "karts/abstract_kart.hpp"
+ #include "karts/abstract_kart_animation.hpp"
+@@ -569,7 +570,7 @@
+ 	
+ 	void update(int player_id) {
+ 		id = player_id;
+-		if (player_id >= 0 && static_cast<unsigned int>(player_id) < Camera::getNumCameras()
++		if (!GUIEngine::isNoGraphics() && player_id >= 0 && static_cast<unsigned int>(player_id) < Camera::getNumCameras()
+ 		    && Camera::getCamera(player_id)->getCameraSceneNode()) {
+ 			if (!camera)
+ 				camera.reset(new PyCamera());
