@@ -437,3 +437,11 @@ headless evaluation logs; these videos are demonstrations, not replacement metri
 See [MULTIMAP.md](MULTIMAP.md) for the shared 3-train / 3-unseen map setup,
 common offline collection, 5k-step commands for both algorithms, saved diagnostics
 and comparison plots. This is a separate experiment from the original Abyss runs.
+
+### Full multi-map experiment - 50k
+
+Use [MULTIMAP_50K.md](MULTIMAP_50K.md) for the complete command sequence:
+prepare the shared expert timeouts, train DAgger and RLPD on seeds 1000/2000/3000,
+evaluate five fixed seeds on all six maps, and generate SVG comparisons per seed.
+Configuration: `multimap_50k.yaml`. Both methods reuse `datasets/multimap/offline/`
+(27 unique episodes, 19,493 transitions); no offline regeneration is needed.

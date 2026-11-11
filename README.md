@@ -193,3 +193,10 @@ make_stkenv = partial(
     wrappers=wrappers
 )
 ```
+
+## Multi-map experiment - 50k
+
+The [full experiment guide](src/main/MULTIMAP_50K.md) contains setup, training and
+plotting commands for DAgger and RLPD with three training seeds, three training
+maps and three unseen evaluation maps. Both reuse `datasets/multimap/offline/`.
+The shared settings are in [multimap_50k.yaml](src/main/multimap_50k.yaml).

@@ -93,12 +93,28 @@ def prepare_protocol(config):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, default=CONFIG_PATH)
-    parser.add_argument('--runs', type=int, default=5)
-    parser.add_argument('--seed-start', type=int, default=10000)
-    parser.add_argument('--output-dir', type=Path,
-                        default=Path(__file__).resolve().parents[2] / 'datasets' / 'expert_benchmark')
-    args = parser.parse_args()
-    if args.runs < 1 or args.seed_start < 0:
+    parser.add_argument('--experiment',type=Path,help='Shared multi-map overrides')
+    parser.add_argument('--freeze-timeouts',action='store_true',
+                        help='Prepare/reuse the shared expert baseline and frozen per-map limits only')
+    parser.add_argument('--runs',type=int,help='Override benchmark run count (default from config, otherwise 5)')
+    parser.add_argument('--seed-start',type=int,help='Override benchmark seed start (default 10000)')
+    parser.add_argument('--output-dir',type=Path,help='Benchmark directory; overrides shared reference when freezing')
+    args=parser.parse_args()
+    if (args.runs is not None and args.runs<1) or (args.seed_start is not None and args.seed_start<0):
         parser.error('Require positive --runs and nonnegative --seed-start')
-    config = OmegaConf.to_container(OmegaConf.load(args.config), resolve=True)
-    run_benchmark(config, args.output_dir, list(range(args.seed_start, args.seed_start + args.runs)))
+    config=OmegaConf.to_container(OmegaConf.merge(OmegaConf.load(args.config),
+        OmegaConf.load(args.experiment) if args.experiment else {}),resolve=True)
+    benchmark=dict(config.get('expert_benchmark') or dict(runs=5,seed_start=10000))
+    if args.runs is not None:benchmark['runs']=args.runs
+    if args.seed_start is not None:benchmark['seed_start']=args.seed_start
+    config['expert_benchmark']=benchmark
+    if args.freeze_timeouts:
+        if config.get('track_timeouts',{}).get('mode')!='expert':
+            parser.error('--freeze-timeouts requires track_timeouts.mode=expert in the experiment config')
+        if args.output_dir is not None:config['track_timeouts']['directory']=str(args.output_dir)
+        directory,limits=prepare_protocol(config)
+        print(f'Shared expert reference ready: {directory}',flush=True)
+        print(f'Per-map limits: {limits}',flush=True)
+    else:
+        output=args.output_dir or Path(__file__).resolve().parents[2]/'datasets/expert_benchmark'
+        run_benchmark(config,output,list(range(benchmark['seed_start'],benchmark['seed_start']+benchmark['runs'])))
