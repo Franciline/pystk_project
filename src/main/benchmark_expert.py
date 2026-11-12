@@ -1,13 +1,14 @@
 """Measure Team4 baseline performance on the configured evaluation tracks."""
 import argparse
-from copy import deepcopy
 import csv
 import json
+from copy import deepcopy
 from pathlib import Path
 import sys
 
+from omegaconf import OmegaConf  # type: ignore[import-not-found]
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from omegaconf import OmegaConf
 from main.DAgger import CONFIG_PATH, to_action
 from agents.team4.agent4 import Agent4
 from pystk2_gymnasium.envs import STKRaceEnv, AgentSpec
@@ -20,7 +21,7 @@ def run_benchmark(config, output_dir, seeds):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     with (output_dir / 'config.json').open('x') as file:
-        json.dump(dict(task_config=config, seeds=seeds, expert='team4'), file, indent=2)
+        json.dump({'task_config': config, 'seeds': seeds, 'expert': 'team4'}, file, indent=2)
     tracks = evaluation_tracks(config)
     env = STKRaceEnv(agent=AgentSpec(rank_start=0, use_ai=False),
                      track=tracks[0], num_kart=1, laps=1, step_size=config['step_size'])

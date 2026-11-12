@@ -376,7 +376,7 @@ The JSON records the current and future world positions from the same replay.
 The installed PySTK build returns no player camera matrices. A tested C++ patch
 restores them without moving the camera: see `patches/pystk2-camera-state.patch`
 and `patches/README.md`. Use the separate local test build to get the projected
-white kart marker and orange dots for every actual future position from +1
+orange dots for every actual future position from +1
 through +N steps:
 
 ```bash
@@ -387,7 +387,7 @@ PYTHONPATH=/tmp/pystk-camera-build/build312 \
 
 This leaves the installed training environment unchanged. The test build is in
 `/tmp`, so it must be rebuilt if removed. Without the patched binding, the script
-labels the reference as screen-center only and does not guess a future dot.
+reports the unavailable camera projection and does not guess future dots.
 With camera matrices, it also saves an NPZ containing the image, matrices and
 current/future world positions. `--future-steps 20` displays +1 through +20;
 only the first and last dots are labeled to keep the image readable. Dots are

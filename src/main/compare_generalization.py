@@ -27,7 +27,11 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def load_rlpd(checkpoint, device):
     # RLPD checkpoints contain normalization; no separate normalizer file needed.
-    config = json.loads((checkpoint.parent / 'config.json').read_text())
+    config_path = checkpoint.parent / 'config.json'
+    if not config_path.exists():
+        selection = json.loads((checkpoint.parent / 'best_actors_selection.json').read_text())
+        config_path = Path(selection['rlpd']['source']).parent / 'config.json'
+    config = json.loads(config_path.read_text())
     config['rlpd']['device'] = device
     state = torch.load(checkpoint, map_location='cpu', weights_only=True)
     encoder = ObservationEncoder(config['encoder']['num_paths'], config['encoder']['num_items'])
@@ -46,35 +50,45 @@ def plot_results(output):
     summary = pd.read_csv(output / 'summary.csv')
     rows['terminated'] = rows['terminated'].astype(str).str.lower().eq('true')
     tracks = list(dict.fromkeys(rows['track']))
-    fig, ax = plt.subplots(figsize=(max(8, len(tracks) * 4), 5))
-    for model_index, (model, color) in enumerate([('DAgger', 'tab:blue'), ('RLPD', 'tab:orange')]):
-        for track_index, track in enumerate(tracks):
+    plt.style.use('seaborn-v0_8-darkgrid')
+    plt.rcParams['svg.fonttype'] = 'none'
+    from matplotlib.patches import Patch
+    from matplotlib.lines import Line2D
+    expert = pd.read_csv(output / 'expert/summary.csv').set_index('track')
+    fig, axes = plt.subplots(1, len(tracks), figsize=(19, 4.5), squeeze=False)
+    labels = {'abyss': 'Abyss', 'volcano_island': 'Volcan Island', 'sandtrack': 'Shifting Sands',
+              'snowtuxpeak': 'Snow Peak', 'xr591': 'XR591', 'zengarden': 'Zen Garden'}
+    colors = {'DAgger': 'tab:blue', 'RLPD': 'tab:orange'}
+    for ax, track in zip(axes[0], tracks):
+        for position, (model, color) in enumerate(colors.items()):
             episode = rows[(rows['model'] == model) & (rows['track'] == track)].sort_values('seed')
-            position = track_index + (-.18 if model_index == 0 else .18)
-            box = ax.boxplot([episode['n_steps']], positions=[position], widths=.28,
-                             patch_artist=True, showfliers=False, manage_ticks=False)
+            box = ax.boxplot([episode['n_steps']], positions=[position], widths=.35,
+                             patch_artist=True, showfliers=False, manage_ticks=False,
+                             medianprops=dict(color=color, linewidth=1.8))
             box['boxes'][0].set(facecolor=color, alpha=.3)
-            offsets = np.linspace(-.06, .06, len(episode))
+            offsets = np.linspace(-.07, .07, len(episode))
             finished = episode['terminated'].to_numpy()
             for mask, marker in [(finished, 'o'), (~finished, 'x')]:
                 ax.scatter(position + offsets[mask], episode['n_steps'].to_numpy()[mask],
-                           color=color, marker=marker, s=35, zorder=3)
-            row = summary[(summary['model'] == model) & (summary['track'] == track)].iloc[0]
-            ax.annotate(f"{int(row['completed'])}/{int(row['episodes'])} finish", (position, 1),
-                        xycoords=('data', 'axes fraction'), xytext=(0, 6),
-                        textcoords='offset points', ha='center', fontsize=9, color=color)
-        ax.plot([], [], color=color, linewidth=5, alpha=.6, label=model)
-    ax.set_xticks(range(len(tracks)), tracks)
-    ax.set(xlabel='Map', ylabel='Episode steps (timeouts included; lower is faster)',
-           title='Selected checkpoints: generalization across maps', ylim=(0, rows['n_steps'].max() * 1.15))
-    ax.legend(); ax.grid(axis='y', alpha=.2)
-    fig.text(.5, .01, 'Dots: completed laps; crosses: incomplete laps. Boxes include timeouts; completion counts shown above.',
-             ha='center', fontsize=9)
-    fig.tight_layout(rect=(0, .04, 1, .94))
-    for extension in ('svg',):
-        path = output / f'generalization_boxplots.{extension}'
-        fig.savefig(path, dpi=180, bbox_inches='tight')
-        print(path)
+                           color=color, marker=marker, s=20, zorder=3, alpha=.75)
+            ax.text(position, 1.02, f'{finished.sum()}/{len(episode)} finish',
+                    transform=ax.get_xaxis_transform(), ha='center', fontsize=9, color=color)
+        ax.axhline(expert.loc[track, 'finish_steps_mean'], color='#333333', linestyle='--', linewidth=1.3)
+        ax.set_xticks([0, 1], ['DAgger', 'RLPD'])
+        ax.set_xlim(-.5, 1.5)
+        ax.set_title(labels.get(track, track), pad=30)
+        ax.set_ylabel('Episode steps')
+        ax.margins(y=.15)
+    handles = [Patch(facecolor=c, alpha=.5, label=m) for m, c in colors.items()]
+    handles += [Line2D([], [], color='#333333', linestyle='--', label='Expert (team4) mean'),
+                Line2D([], [], color='gray', marker='o', linestyle='', label='Completed lap'),
+                Line2D([], [], color='gray', marker='x', linestyle='', label='Incomplete lap (timeout)')]
+    fig.suptitle('DAgger and RLPD across maps - 20 evaluation seeds', y=.99)
+    fig.legend(handles=handles, loc='lower center', ncol=5, frameon=False, bbox_to_anchor=(.5, 0))
+    fig.tight_layout(rect=(0, .09, 1, .94))
+    path = output / 'generalization_boxplots.svg'
+    fig.savefig(path, bbox_inches='tight')
+    print(path)
     plt.close(fig)
 
 
@@ -101,6 +115,9 @@ def compare(config, dagger, rlpd, device, output):
                 print(f"Completed {summary['completed']}/{summary['episodes']}; mean steps={summary['steps_mean']:.1f}", flush=True)
     finally:
         env.close()
+    from main.benchmark_expert import run_benchmark
+    expert_config = dict(config, train_tracks=settings['tracks'], unseen_tracks=[])
+    run_benchmark(expert_config, output / 'expert', settings['seeds'])
     plot_results(output)
 
 

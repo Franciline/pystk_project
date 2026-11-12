@@ -12,7 +12,7 @@ N: 11  # DAgger: one offline fit/eval + ten online collection/train/eval rounds.
 steps_per_iteration: 5000
 total_env_steps: 50000  # RLPD online budget.
 eval_every: 5000
-normalize_observations: false  # RLPD only. DAgger keeps its fitted normalizer.
+normalize_observations: true  # RLPD only. DAgger keeps its fitted normalizer.
 
 offline:
   dataset: datasets/multimap/offline  # Reuse the existing 27 unique episodes.
