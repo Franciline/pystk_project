@@ -1,0 +1,2 @@
+checkpoint,episodes,completed,completion_rate,timeouts,steps_mean,steps_std,finish_steps_mean,finish_steps_std
+best,20,20,1.0,0,585.15,10.33784564750214,585.15,10.33784564750214
