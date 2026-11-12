@@ -1,0 +1,12 @@
+{
+  "iteration": 6,
+  "online_steps": 26622,
+  "episodes": 5,
+  "completed": 5,
+  "completion_rate": 1.0,
+  "timeouts": 0,
+  "steps_mean": 580.4,
+  "steps_std": 5.89915248150105,
+  "finish_steps_mean": 580.4,
+  "finish_steps_std": 5.89915248150105
+}
