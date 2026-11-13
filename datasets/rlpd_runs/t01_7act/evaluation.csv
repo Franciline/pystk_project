@@ -1,4 +1,0 @@
-env_steps,train_episodes,episodes,completed,completion_rate,timeouts,steps_mean,steps_std,finish_steps_mean,finish_steps_std,improved
-5000,5,5,5,1.0,0,671.2,13.863621460498694,671.2,13.863621460498694,True
-10000,10,5,0,0.0,5,1000.0,0.0,,,False
-15000,15,5,0,0.0,5,1000.0,0.0,,,False
