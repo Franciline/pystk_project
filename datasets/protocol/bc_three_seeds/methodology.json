@@ -1,0 +1,36 @@
+{
+  "track": "abyss",
+  "training_seeds": [
+    1000,
+    2000,
+    3000
+  ],
+  "race_seeds": [
+    20000,
+    20001,
+    20002,
+    20003,
+    20004,
+    20005,
+    20006,
+    20007,
+    20008,
+    20009,
+    20010,
+    20011,
+    20012,
+    20013,
+    20014,
+    20015,
+    20016,
+    20017,
+    20018,
+    20019
+  ],
+  "checkpoint": "actor_iteration_1.pt from each dagger_offline_gaussian_seed run",
+  "statistics": "Pooled sample mean and sample std (ddof=1) across completed test laps; paired BC minus expert on matching race seeds",
+  "confidence_interval_and_p_value": "Not computed; left blank for colleague",
+  "dependence": "Three trained models, each evaluated on the same 20 race seeds. Expert observations repeat across training seeds; retain training_seed and race_seed when computing uncertainty.",
+  "training_seed_mean_steps_std": 6.0177515180782555,
+  "reused_existing_test": "Training seed 1000; newly evaluated seeds 2000 and 3000"
+}

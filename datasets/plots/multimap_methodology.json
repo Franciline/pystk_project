@@ -1,0 +1,37 @@
+{
+  "source": "/Users/minechu/Desktop/Work/Master/RL/RL-mini-projects/projet2/pystk_project/datasets/multimap/full5maps50k",
+  "training_seeds": [
+    1000,
+    2000,
+    3000
+  ],
+  "test_seeds": [
+    20000,
+    20001,
+    20002,
+    20003,
+    20004,
+    20005,
+    20006,
+    20007,
+    20008,
+    20009,
+    20010,
+    20011,
+    20012,
+    20013,
+    20014,
+    20015,
+    20016,
+    20017,
+    20018,
+    20019
+  ],
+  "selection": "Validation-selected best per training seed; BC iteration 1; unseen excluded",
+  "alignment": "DAgger: (iteration-1)*5000; RLPD: floor(actual steps/5000)*5000; missing checkpoints left missing",
+  "variability": "Sample std across the three training-seed summaries, not a confidence interval; boxes pool 60 laps with seed markers",
+  "map_weighting": "Equal map weighting within each split",
+  "timeouts": "Included in step boxes; excluded from conditional finishing-speed means",
+  "relative_missing": "No aggregate errorbar if any training seed has zero completions; individual available points retained",
+  "evaluation": "CPU, two isolated simulator workers; original observation normalization restored"
+}

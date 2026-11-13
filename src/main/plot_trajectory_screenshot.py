@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from main.compare_trajectories import ROOT
-from main.compare_generalization import load_rlpd
+from main.plot_trajectories import ROOT
+from main.evaluate import comparison_load_rlpd as load_rlpd
 from agents.dagger_actor import ActorPolicy
 from main.DAgger import to_action
 from agents.team4.agent4 import Agent4

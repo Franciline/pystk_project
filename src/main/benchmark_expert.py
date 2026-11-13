@@ -9,7 +9,8 @@ import sys
 from omegaconf import OmegaConf  # type: ignore[import-not-found]
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from main.DAgger import CONFIG_PATH, to_action
+from main.DAgger import to_action
+from utils.experiment_config import CONFIG_PATH, load_config
 from agents.team4.agent4 import Agent4
 from pystk2_gymnasium.envs import STKRaceEnv, AgentSpec
 from utils.track_diagnostics import save_track_diagnostics
@@ -93,6 +94,7 @@ def prepare_protocol(config):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--profile', default='singlemap_dagger')
     parser.add_argument('--config', type=Path, default=CONFIG_PATH)
     parser.add_argument('--experiment',type=Path,help='Shared multi-map overrides')
     parser.add_argument('--freeze-timeouts',action='store_true',
@@ -103,7 +105,7 @@ if __name__ == '__main__':
     args=parser.parse_args()
     if (args.runs is not None and args.runs<1) or (args.seed_start is not None and args.seed_start<0):
         parser.error('Require positive --runs and nonnegative --seed-start')
-    config=OmegaConf.to_container(OmegaConf.merge(OmegaConf.load(args.config),
+    config=OmegaConf.to_container(OmegaConf.merge(load_config(args.config, args.profile),
         OmegaConf.load(args.experiment) if args.experiment else {}),resolve=True)
     benchmark=dict(config.get('expert_benchmark') or dict(runs=5,seed_start=10000))
     if args.runs is not None:benchmark['runs']=args.runs

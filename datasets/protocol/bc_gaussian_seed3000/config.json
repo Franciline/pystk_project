@@ -1,0 +1,31 @@
+{
+  "checkpoint": "/Users/minechu/Desktop/Work/Master/RL/RL-mini-projects/projet2/pystk_project/datasets/protocol/dagger_offline_gaussian_seed3000/actor_iteration_1.pt",
+  "sha256": "dae3e5d69832e8e5469f7bbecf615122102a2ed5b23c64c73fd5a14ff2705a13",
+  "role": "Behavioral cloning: DAgger iteration 1",
+  "track": "abyss",
+  "step_size": 0.1,
+  "max_steps": 1000,
+  "seeds": [
+    20000,
+    20001,
+    20002,
+    20003,
+    20004,
+    20005,
+    20006,
+    20007,
+    20008,
+    20009,
+    20010,
+    20011,
+    20012,
+    20013,
+    20014,
+    20015,
+    20016,
+    20017,
+    20018,
+    20019
+  ],
+  "device": "mps"
+}

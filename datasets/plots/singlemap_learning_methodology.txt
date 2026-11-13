@@ -1,0 +1,7 @@
+Source: single-map Abyss Gaussian DAgger and RLPD runs, training seeds [1000, 2000, 3000].
+Every recorded evaluation is used, not a running best checkpoint.
+Targets: DAgger (iteration-1)*5000; RLPD floor(actual online steps/5000)*5000. Actual counts are preserved.
+Missing targets remain missing. RLPD has no invented zero-step value.
+BC is the initial offline-only DAgger validation baseline, held constant.
+Means and sample standard deviations are across training-seed evaluation means, not individual laps or confidence intervals.
+Finishing steps use successful laps only. A combined point is omitted if any training seed has no completed lap.

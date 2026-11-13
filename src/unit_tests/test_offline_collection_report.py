@@ -3,7 +3,7 @@ import gzip,pickle,json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
-from main.collect_multitrack_offline import collect_dataset
+from main.collect_offline import collect_dataset
 
 
 class Env:
@@ -28,18 +28,18 @@ def test_collection():
             p=kw['output'];p.parent.mkdir(parents=True,exist_ok=True)
             with gzip.open(p,'wb') as f:pickle.dump(episode,f)
             return dict(n_steps=1)
-        with patch('main.collect_multitrack_offline.prepare_config',lambda x:x),\
-             patch('main.collect_multitrack_offline.STKRaceEnv',Env),\
-             patch('main.collect_multitrack_offline.collect_episode',collect):
+        with patch('main.collect_offline.prepare_config',lambda x:x),\
+             patch('main.collect_offline.STKRaceEnv',Env),\
+             patch('main.collect_offline.collect_episode',collect):
             totals=collect_dataset(c)
         assert totals['trajectories_before']==24 and totals['trajectories_after']==18
         assert len(list((root/'raw').rglob('*.pkl.gz')))==24
         assert len(list((root/'unique').rglob('*.pkl.gz')))==18
         report=json.loads((root/'unique/manifest.json').read_text())
         assert len(report['retained_files'])==18
-        with patch('main.collect_multitrack_offline.prepare_config',lambda x:x),\
-             patch('main.collect_multitrack_offline.STKRaceEnv',Env),\
-             patch('main.collect_multitrack_offline.collect_episode',side_effect=AssertionError('Recollected')):
+        with patch('main.collect_offline.prepare_config',lambda x:x),\
+             patch('main.collect_offline.STKRaceEnv',Env),\
+             patch('main.collect_offline.collect_episode',side_effect=AssertionError('Recollected')):
             assert collect_dataset(c)==totals
 
 

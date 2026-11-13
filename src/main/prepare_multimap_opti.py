@@ -13,7 +13,8 @@ import sys
 from omegaconf import OmegaConf
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from main.benchmark_expert import run_benchmark, prepare_protocol
-from main.collect_multitrack_offline import collect_dataset
+from main.collect_offline import collect_dataset
+from utils.experiment_config import CONFIG_PATH, load_config
 from utils.episode_deduplication import drop_duplicates, deduplication_report
 from utils.multitrack import evaluation_tracks
 
@@ -156,8 +157,9 @@ def prepare_offline(config):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--config', type=Path, default=Path(__file__).with_name('multimap_25k_opti.yaml'))
+    parser.add_argument('--config', type=Path, default=CONFIG_PATH)
+    parser.add_argument('--profile', default='multimap_dagger')
     parser.add_argument('--stage', choices=['expert', 'offline'], required=True)
     args = parser.parse_args()
-    config = OmegaConf.to_container(OmegaConf.load(args.config), resolve=True)
+    config = OmegaConf.to_container(load_config(args.config, args.profile), resolve=True)
     (prepare_expert if args.stage == 'expert' else prepare_offline)(config)

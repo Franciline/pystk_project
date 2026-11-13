@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 import numpy as np
 import pandas as pd
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from main.plot_multimap_results import aligned_history,macro_history,plot_final,METHODS
+from utils.multimap_reports import aligned_history,macro_history,plot_final,METHODS
 
 
 def check():

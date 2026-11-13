@@ -27,6 +27,12 @@ datasets/rlpd_runs/smoke*
 datasets/rlpd
 datasets/*/*/*.pt
 datasets/*/*/*.npz
+datasets/tested
+datasets/plots
+datasets/**/*.csv
+datasets/**/*.json
+**/*.svg
+**/*.csv
 
 *.DS_STORE
 *.pt

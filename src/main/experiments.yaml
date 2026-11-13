@@ -1,0 +1,302 @@
+common:
+  max_steps: 1000
+  step_size: 0.1
+  seed: 1000
+  online_seed_start: 1000
+  evaluation:
+    seeds:
+    - 10000
+    - 10001
+    - 10002
+    - 10003
+    - 10004
+    min_steps_improvement: 0
+  diagnostics:
+    enabled: true
+    stuck_seconds: 5
+    stuck_radius_m: 1
+    save_evaluation_episodes: true
+profiles:
+  singlemap_dagger:
+    'N': 11
+    steps_per_iteration: 5000
+    track: abyss
+    online_epsilon: 0.1
+    exploration:
+      mode: gaussian
+      probability: 1.0
+      acceleration_std: 0.1
+      steer_std: 0.05
+    output_dir: datasets/protocol/dagger_seed1000
+    initialization:
+      mode: generate_offline
+      epsilons:
+      - 0.0
+      - 0.1
+      - 0.3
+      episodes_per_epsilon: 3
+      dataset: datasets/d0_abyss_team4
+    actor:
+      num_paths: 182
+      num_items: 10
+      hidden_sizes:
+      - 256
+      - 256
+      learning_rate: 0.001
+      batch_size: 256
+      epochs: 5
+      continuous_weight: 1.0
+      boolean_weight: 1.0
+      device: auto
+    expert_benchmark:
+      runs: 5
+      seed_start: 10000
+    comparison:
+      tracks:
+      - abyss
+      - snowtuxpeak
+      seeds:
+      - 20000
+      - 20001
+      - 20002
+      - 20003
+      - 20004
+      output_dir: datasets/protocol/comparison
+    method: dagger
+  singlemap_rlpd:
+    normalize_observations: false
+    track: abyss
+    output_dir: datasets/protocol/rlpd_seed1000
+    encoder:
+      num_paths: 182
+      num_items: 10
+    offline:
+      dataset: datasets/rlpd_offline_data
+      episodes_per_epsilon: 3
+      seed_start: 0
+      agents:
+      - team4
+      epsilons:
+      - 0.0
+      - 0.1
+      - 0.3
+    learned_actions:
+    - acceleration
+    - steer
+    - brake
+    - drift
+    - fire
+    - nitro
+    total_env_steps: 50000
+    eval_every: 5000
+    rlpd:
+      hidden_sizes:
+      - 256
+      - 256
+      batch_size: 256
+      utd_ratio: 10
+      num_critics: 5
+      num_min_critics: 2
+      gamma: 0.99
+      tau: 0.005
+      actor_lr: 0.0003
+      critic_lr: 0.0003
+      temperature_lr: 0.0003
+      init_temperature: 0.1
+      device: auto
+    method: rlpd
+  multimap_dagger:
+    train_tracks:
+    - abyss
+    - volcano_island
+    - sandtrack
+    - hacienda
+    - minigolf
+    unseen_tracks:
+    - snowtuxpeak
+    - xr591
+    - zengarden
+    'N': 11
+    steps_per_iteration: 5000
+    normalize_observations: true
+    offline:
+      dataset: datasets/multimap/offline5
+      agents:
+      - team4
+      epsilons:
+      - 0.0
+      - 0.1
+      - 0.3
+      episodes_per_epsilon: 3
+      seed_start: 0
+    initialization:
+      mode: load_offline
+      episodes_per_epsilon: ${offline.episodes_per_epsilon}
+      epsilons: ${offline.epsilons}
+      dataset: ${offline.dataset}
+    expert_benchmark:
+      runs: 5
+      seed_start: 10000
+    track_timeouts:
+      mode: expert
+      margin_steps: 400
+      benchmark_max_steps: 5000
+      directory: datasets/multimap/expert_reference5
+    exploration:
+      mode: gaussian
+      probability: 1.0
+      acceleration_std: 0.1
+      steer_std: 0.05
+    online_epsilon: 0.1
+    actor:
+      num_paths: 182
+      num_items: 10
+      hidden_sizes:
+      - 256
+      - 256
+      learning_rate: 0.001
+      batch_size: 256
+      epochs: 5
+      continuous_weight: 1.0
+      boolean_weight: 1.0
+      device: auto
+    encoder:
+      num_paths: 182
+      num_items: 10
+    output_dir: datasets/multimap/full5maps50k/dagger_seed1000
+    optimization:
+      evaluation_workers: 2
+      torch_threads: 2
+      reuse_expert: datasets/multimap/expert_reference
+      reuse_offline: datasets/multimap/offline
+      additional_offline: datasets/multimap/offline5_additions
+    method: dagger
+  multimap_rlpd:
+    train_tracks:
+    - abyss
+    - volcano_island
+    - sandtrack
+    - hacienda
+    - minigolf
+    unseen_tracks:
+    - snowtuxpeak
+    - xr591
+    - zengarden
+    total_env_steps: 50000
+    eval_every: 5000
+    normalize_observations: true
+    offline:
+      dataset: datasets/multimap/offline5
+      agents:
+      - team4
+      epsilons:
+      - 0.0
+      - 0.1
+      - 0.3
+      episodes_per_epsilon: 3
+      seed_start: 0
+    expert_benchmark:
+      runs: 5
+      seed_start: 10000
+    track_timeouts:
+      mode: expert
+      margin_steps: 400
+      benchmark_max_steps: 5000
+      directory: datasets/multimap/expert_reference5
+    encoder:
+      num_paths: 182
+      num_items: 10
+    learned_actions:
+    - acceleration
+    - steer
+    - brake
+    - drift
+    - fire
+    - nitro
+    rlpd:
+      hidden_sizes:
+      - 256
+      - 256
+      batch_size: 256
+      utd_ratio: 10
+      num_critics: 5
+      num_min_critics: 2
+      gamma: 0.99
+      tau: 0.005
+      actor_lr: 0.0003
+      critic_lr: 0.0003
+      temperature_lr: 0.0003
+      init_temperature: 0.1
+      device: auto
+    output_dir: datasets/multimap/full5maps50k/rlpd_seed1000
+    optimization:
+      evaluation_workers: 2
+      torch_threads: 2
+      offline_cache: datasets/multimap/offline5_rlpd_cache
+    method: rlpd
+  multimap25k_dagger:
+    train_tracks:
+    - abyss
+    - volcano_island
+    - sandtrack
+    - hacienda
+    - minigolf
+    unseen_tracks:
+    - snowtuxpeak
+    - xr591
+    - zengarden
+    'N': 6
+    steps_per_iteration: 5000
+    normalize_observations: true
+    offline:
+      dataset: datasets/multimap/offline5
+      agents:
+      - team4
+      epsilons:
+      - 0.0
+      - 0.1
+      - 0.3
+      episodes_per_epsilon: 3
+      seed_start: 0
+    initialization:
+      mode: load_offline
+      episodes_per_epsilon: ${offline.episodes_per_epsilon}
+      epsilons: ${offline.epsilons}
+      dataset: ${offline.dataset}
+    expert_benchmark:
+      runs: 5
+      seed_start: 10000
+    track_timeouts:
+      mode: expert
+      margin_steps: 400
+      benchmark_max_steps: 5000
+      directory: datasets/multimap/expert_reference5
+    exploration:
+      mode: gaussian
+      probability: 1.0
+      acceleration_std: 0.1
+      steer_std: 0.05
+    online_epsilon: 0.1
+    actor:
+      num_paths: 182
+      num_items: 10
+      hidden_sizes:
+      - 256
+      - 256
+      learning_rate: 0.001
+      batch_size: 256
+      epochs: 5
+      continuous_weight: 1.0
+      boolean_weight: 1.0
+      device: auto
+    encoder:
+      num_paths: 182
+      num_items: 10
+    output_dir: datasets/multimap/full25k/dagger_seed1000
+    optimization:
+      evaluation_workers: 2
+      torch_threads: 2
+      reuse_expert: datasets/multimap/expert_reference
+      reuse_offline: datasets/multimap/offline
+      additional_offline: datasets/multimap/offline5_additions
+    method: dagger

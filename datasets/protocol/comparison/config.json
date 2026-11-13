@@ -1,0 +1,21 @@
+{
+  "comparison": {
+    "tracks": [
+      "abyss",
+      "snowtuxpeak"
+    ],
+    "seeds": [
+      20000,
+      20001,
+      20002,
+      20003,
+      20004
+    ],
+    "output_dir": "datasets/protocol/comparison"
+  },
+  "step_size": 0.1,
+  "max_steps": 1000,
+  "dagger": "/Users/minechu/Desktop/Work/Master/RL/RL-mini-projects/projet2/pystk_project/datasets/protocol/dagger_offline_seed3000/actor_best.pt",
+  "rlpd": "/Users/minechu/Desktop/Work/Master/RL/RL-mini-projects/projet2/pystk_project/datasets/protocol/rlpd_seed1000/agent_best.pt",
+  "device": "auto"
+}

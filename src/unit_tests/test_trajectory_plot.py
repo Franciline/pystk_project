@@ -4,7 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import numpy as np
 import pandas as pd
-from main.compare_trajectories import plot_trajectories, widen_positions, road_offsets, MODELS, FILES
+from main.plot_trajectories import plot_trajectories, widen_positions, road_offsets, MODELS, FILES
 
 
 def test_plot():

@@ -113,7 +113,7 @@ def single_race(env, agents, names, output, seed=None, max_steps=MAX_STEPS, acto
 
 def load_rlpd(checkpoint, config, no_normalization=False):
     if not no_normalization and not (checkpoint.parent / 'normalizer.npz').exists():
-        from main.compare_generalization import load_rlpd as load_checkpoint
+        from main.evaluate import comparison_load_rlpd as load_checkpoint
         return load_checkpoint(checkpoint, config['rlpd'].get('device', 'auto'))
     # rebuild the RLPD agent with the run's own settings
     from agents.rlpd_agent import RLPDAgent

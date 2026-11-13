@@ -13,8 +13,10 @@ from main import prepare_multimap_opti as prep
 ROOT=Path(__file__).resolve().parents[2]
 
 
+from utils.experiment_config import load_config
+
 def check():
-    c=OmegaConf.to_container(OmegaConf.load(ROOT/'src/main/multimap_25k_opti.yaml'),resolve=True)
+    c=OmegaConf.to_container(load_config(profile='multimap25k_dagger'),resolve=True)
     assert len(c['train_tracks'])==5 and len(c['unseen_tracks'])==3 and c['N']==6
     assert set(c['train_tracks']).isdisjoint(c['unseen_tracks'])
     with TemporaryDirectory(prefix='prepare-opti-') as name:

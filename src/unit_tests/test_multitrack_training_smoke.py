@@ -14,6 +14,8 @@ from pystk2_gymnasium.envs import STKRaceEnv,AgentSpec
 ROOT=Path(__file__).resolve().parents[2]
 
 
+from utils.experiment_config import load_config
+
 def smoke():
     with TemporaryDirectory(prefix='stk-multimap-check-') as directory:
         root=Path(directory);data=root/'offline'
@@ -30,13 +32,13 @@ def smoke():
                 snowtuxpeak=8,xr591=9,zengarden=10),expert_benchmark=None,seed=1000,online_seed_start=1000,
             evaluation=dict(seeds=[10000],min_steps_improvement=0),
             diagnostics=dict(enabled=True,save_evaluation_episodes=True,stuck_seconds=5,stuck_radius_m=1))
-        c=OmegaConf.to_container(OmegaConf.load(ROOT/'src/main/dagger_config.yaml'),resolve=True)
+        c=OmegaConf.to_container(load_config(profile='singlemap_dagger'),resolve=True)
         c.update(deepcopy(common));c.update(N=3,steps_per_iteration=15,output_dir=str(root/'dagger'))
         c['initialization'].update(mode='load_offline',dataset=str(data))
         c['actor'].update(num_paths=182,num_items=10,hidden_sizes=[8],batch_size=4,epochs=1,device='cpu')
         policy=ActorPolicy(c['actor'],root/'dagger',c['seed'])
         run_dagger(c,learner=policy,train_policy=train_policy)
-        c=OmegaConf.to_container(OmegaConf.load(ROOT/'src/main/rlpd_config.yaml'),resolve=True)
+        c=OmegaConf.to_container(load_config(profile='singlemap_rlpd'),resolve=True)
         c.update(deepcopy(common));c.update(total_env_steps=36,eval_every=18,output_dir=str(root/'rlpd'))
         c['offline']['dataset']=str(data);c['encoder'].update(num_paths=182,num_items=10)
         c['rlpd'].update(hidden_sizes=[8],batch_size=4,utd_ratio=1,num_critics=2,num_min_critics=2,device='cpu')

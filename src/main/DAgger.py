@@ -26,7 +26,7 @@ from utils.dagger_evaluation import evaluate_policy, append_metrics, is_improvem
 from utils.multitrack import (train_tracks,next_track,evaluate_tracks,track_step_limit,
     prepare_config,save_expert_reference,MapCollection,report_collection)
 
-CONFIG_PATH = Path(__file__).with_name('dagger_config.yaml')
+from utils.experiment_config import CONFIG_PATH, load_config
 BUTTONS = ('brake', 'drift', 'fire', 'nitro', 'rescue')
 
 
@@ -292,12 +292,11 @@ def run_dagger(config, *, learner=None, train_policy=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, default=CONFIG_PATH)
+    parser.add_argument('--profile', default='singlemap_dagger')
     parser.add_argument('--experiment',type=Path,help='Shared multi-map overrides')
     args, overrides = parser.parse_known_args()
-    config = OmegaConf.to_container(OmegaConf.merge(
-        OmegaConf.load(args.config),
-        OmegaConf.load(args.experiment) if args.experiment else {},
-        OmegaConf.from_dotlist(overrides)), resolve=True)
+    config = OmegaConf.to_container(load_config(args.config, args.profile,
+        experiment=args.experiment, overrides=overrides, method='dagger'), resolve=True)
     from agents.dagger_actor import ActorPolicy, train_policy
     output_dir = Path(config['output_dir'])
     if not output_dir.is_absolute():

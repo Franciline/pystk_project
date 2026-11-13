@@ -24,7 +24,7 @@ from utils.dataset_recorder import DatasetRecorder
 from utils.multitrack_rlpd_opti import (train_tracks,next_track,evaluate_tracks,track_step_limit,
     prepare_config,save_expert_reference,MapCollection,report_collection)
 
-CONFIG_PATH = Path(__file__).with_name('full5maps50k_rlpd_opti.yaml')
+from utils.experiment_config import CONFIG_PATH, load_config
 FIELDS = ('obs', 'action', 'reward', 'next_obs', 'terminated')
 
 
@@ -189,9 +189,9 @@ def run_rlpd(config):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, default=CONFIG_PATH)
+    parser.add_argument('--profile', default='multimap_rlpd')
     parser.add_argument('--experiment',type=Path,help='Shared multi-map overrides')
     args, overrides = parser.parse_known_args()
     # key=value overrides on the command line, e.g. total_env_steps=2000
-    config = OmegaConf.merge(OmegaConf.load(args.config),
-        OmegaConf.load(args.experiment) if args.experiment else {},OmegaConf.from_dotlist(overrides))
+    config = load_config(args.config, args.profile, experiment=args.experiment, overrides=overrides, method='rlpd')
     run_rlpd(OmegaConf.to_container(config, resolve=True))

@@ -2,7 +2,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import pandas as pd
-from main.plot_multimap_comparison import plot
+from main.unused.plot_multimap_comparison import plot
 
 
 if __name__=='__main__':

@@ -14,8 +14,8 @@ from PIL import Image, ImageDraw, ImageFont
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from main.plot_trajectory_screenshot import project
-from main.compare_trajectories import ROOT
-from main.compare_generalization import load_rlpd
+from main.plot_trajectories import ROOT
+from main.evaluate import comparison_load_rlpd as load_rlpd
 from main.DAgger import to_action
 from agents.dagger_actor import ActorPolicy
 from pystk2_gymnasium.envs import STKRaceEnv, AgentSpec

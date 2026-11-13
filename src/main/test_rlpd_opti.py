@@ -24,8 +24,10 @@ from utils.observation_normalizer import ObservationNormalizer
 ROOT=Path(__file__).resolve().parents[2]
 
 
+from utils.experiment_config import load_config
+
 def config_for_test(directory, device='cpu'):
-    c=OmegaConf.to_container(OmegaConf.load(ROOT/'src/main/full5maps50k_rlpd_opti.yaml'),resolve=True)
+    c=OmegaConf.to_container(load_config(profile='multimap_rlpd'),resolve=True)
     c.update(train_tracks=['abyss','volcano_island'],unseen_tracks=['sandtrack'],
         output_dir=str(directory/'run'), total_env_steps=9,eval_every=3,max_steps=3,
         max_steps_by_track={t:3 for t in ('abyss','volcano_island','sandtrack')})
