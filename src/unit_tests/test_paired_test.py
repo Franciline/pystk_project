@@ -1,7 +1,12 @@
-"""Run with: python src/main/test_paired_test.py."""
+"""Run with: python src/unit_tests/test_paired_test.py."""
+import sys
+from pathlib import Path
+
 import numpy as np
 
-from paired_test import sign_flip_p
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from main.paired_test import sign_flip_p
 
 
 if __name__ == '__main__':

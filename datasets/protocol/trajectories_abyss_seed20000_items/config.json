@@ -1,8 +1,0 @@
-{
-  "track": "abyss",
-  "seed": 20000,
-  "max_steps": 1000,
-  "step_size": 0.1,
-  "dagger": "/Users/minechu/Desktop/Work/Master/RL/RL-mini-projects/projet2/pystk_project/datasets/protocol/best_dagger_gaussian/actor_best.pt",
-  "rlpd": "/Users/minechu/Desktop/Work/Master/RL/RL-mini-projects/projet2/pystk_project/datasets/protocol/rlpd_seed1000/agent_best.pt"
-}
