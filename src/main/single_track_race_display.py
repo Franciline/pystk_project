@@ -4,6 +4,7 @@ import argparse
 import json
 import random
 import numpy as np
+import torch
 from copy import deepcopy
 from importlib import import_module
 import sys, os
@@ -141,7 +142,8 @@ def main_loop(output, checkpoint=None, seed=None, device='auto', track=None, del
     if checkpoint is not None:
         config_path = checkpoint.parent / 'config.json'
         config = json.loads(config_path.read_text()) if config_path.exists() else {}
-        if 'rlpd' in config:  # RLPD run folder
+        checkpoint_state = torch.load(checkpoint, map_location='cpu', weights_only=True)
+        if 'actor' in checkpoint_state:  # Shared configs can contain both algorithms.
             policy = load_rlpd(checkpoint, config, no_normalization=no_normalization)
         else:
             from agents.dagger_actor import ActorPolicy
