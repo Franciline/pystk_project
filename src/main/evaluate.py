@@ -153,7 +153,7 @@ def main():
     if not directories and (not args.expert):
         parser.error('Specify --run-dirs or --expert')
     expert_dir = args.output_dir or single_EXPERT_DIR
-    destinations = {directory: args.output_dir/directory.name if args.output_dir else directory for directory in directories}
+    destinations = {directory: (args.output_dir if len(directories) == 1 else args.output_dir/directory.name) if args.output_dir else directory for directory in directories}
     if args.expert and expert_dir in destinations.values():
         parser.error('Expert output must be separate from learner outputs')
     for directory in list(destinations.values()) + ([expert_dir] if args.expert else []):

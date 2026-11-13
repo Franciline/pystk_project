@@ -13,8 +13,10 @@ if __name__ == '__main__':
         if name.startswith('multimap'):
             assert len(c['train_tracks']) == 5 and len(c['unseen_tracks']) == 3
             assert c['normalize_observations']
-        if 'initialization' in c and c['initialization']['mode'] == 'load_offline':
+        if 'offline' in c and 'initialization' in c and c['initialization']['mode'] == 'load_offline':
             assert c['initialization']['dataset'] == c['offline']['dataset']
+    assert load_config(profile='singlemap_dagger').initialization.mode == 'load_offline'
+    assert load_config(profile='singlemap_rlpd').normalize_observations
     changed = load_config(profile='multimap_dagger', overrides=['seed=2000', 'offline.episodes_per_epsilon=4'])
     assert changed.seed == 2000 and changed.initialization.episodes_per_epsilon == 4
     assert load_config(profile='multimap_dagger').seed == 1000

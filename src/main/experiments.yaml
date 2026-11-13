@@ -27,15 +27,15 @@ profiles:
       probability: 1.0
       acceleration_std: 0.1
       steer_std: 0.05
-    output_dir: datasets/protocol/dagger_seed1000
+    output_dir: datasets/protocol/dagger_offline_gaussian_seed1000
     initialization:
-      mode: generate_offline
+      mode: load_offline
       epsilons:
       - 0.0
       - 0.1
       - 0.3
       episodes_per_epsilon: 3
-      dataset: datasets/d0_abyss_team4
+      dataset: datasets/rlpd_offline_data/abyss
     actor:
       num_paths: 182
       num_items: 10
@@ -64,7 +64,7 @@ profiles:
       output_dir: datasets/protocol/comparison
     method: dagger
   singlemap_rlpd:
-    normalize_observations: false
+    normalize_observations: true
     track: abyss
     output_dir: datasets/protocol/rlpd_seed1000
     encoder:
@@ -72,7 +72,7 @@ profiles:
       num_items: 10
     offline:
       dataset: datasets/rlpd_offline_data
-      episodes_per_epsilon: 3
+      episodes_per_epsilon: 10
       seed_start: 0
       agents:
       - team4

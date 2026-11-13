@@ -1,94 +1,53 @@
-## SuperTuxKart Bots race project
+# SuperTuxKart policy learning
 
-[![PyPI
-version](https://badge.fury.io/py/pystk2-gymnasium.svg)](https://badge.fury.io/py/pystk2-gymnasium)
+[![PyPI version](https://badge.fury.io/py/pystk2-gymnasium.svg)](https://badge.fury.io/py/pystk2-gymnasium)
 
-Read the [Changelog](./CHANGELOG.md)
+This project compares Behavioral Cloning, DAgger and RLPD for completing a solo
+SuperTuxKart lap as quickly as possible. Experiments cover learning on a single
+track and generalization to unseen tracks.
 
-## Learned policies - one-lap videos
+### Authors
 
-Both selected checkpoints use training seed **1000**: RLPD and DAgger with Gaussian
-exploration. These graphical recordings use **Abyss**, evaluation seed **20000**,
-one kart and one lap, with deterministic actor actions and their saved normalization.
+- Chu Amélie
+- Tambellini Alan
 
-| RLPD | DAgger Gaussian |
+---
+
+The videos below show the selected best RLPD and DAgger policies trained on
+**Abyss**. Orange dots show future kart positions from the same recorded lap.
+
+Click a preview to watch the full video.
+
+| RLPD | DAgger |
 | :---: | :---: |
-| [![RLPD lap with future trajectory dots](assets/rollouts/rlpd_abyss_seed20000.gif)](assets/rollouts/rlpd_abyss_seed20000.mp4) | [![DAgger Gaussian lap with future trajectory dots](assets/rollouts/dagger_abyss_seed20000.gif)](assets/rollouts/dagger_abyss_seed20000.mp4) |
-| [Full lap - MP4](assets/rollouts/rlpd_abyss_seed20000.mp4) | [Full lap - MP4](assets/rollouts/dagger_abyss_seed20000.mp4) |
-
-The white marker indicates the current kart position. Orange dots show its next
-**10 positions**, about **1 second** ahead. The actor predicts actions; the dots
-show the positions those actions actually produced in the simulator. Frames,
-camera matrices and positions come from the same recorded run, then the dots are
-added afterward. They are not positions predicted directly by the network.
-
-The looping previews show 16 seconds at normal speed. Click a preview for the
-complete lap. See the [recording commands](src/main/README.md#record-policy-videos)
-and the [camera binding patch](patches/README.md) to reproduce them.
+| [![RLPD lap](assets/rollouts/rlpd_abyss_seed20000.gif)](assets/rollouts/rlpd_abyss_seed20000.mp4) | [![DAgger lap](assets/rollouts/dagger_abyss_seed20000.gif)](assets/rollouts/dagger_abyss_seed20000.mp4) |
 
 ## Install
 
-We assume you are on linux
+The original installation instructions below assume Linux. See this
+[uv tutorial](https://www.datacamp.com/tutorial/python-uv) for help getting started.
 
-Read this uv tutorial: https://www.datacamp.com/tutorial/python-uv
+- [Fork and clone the project](https://docs.github.com/fr/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo).
+- Install uv: `sudo snap install astral-uv`.
+- Initialize your project: `uv init "myprojectname"`.
+- Install the requirements: `uv pip install -r requirements.txt`.
+- Install the project: `uv pip install -e .`.
 
-- Fork this project onto your disk: https://docs.github.com/fr/pull-requests/collaborating-with-pull-requests/working-with-forks/fork-a-repo
-- install uv: `sudo snap install astral-uv`
-- create your project: `uv init "myprojectname"`
-- install the requirements: `uv pip install -r` requirements.txt
-- install the project: `uv pip install -e .`
+Commands for training, evaluation, plotting and running policies are documented
+in the [experiment guides](docs/README.md).
 
-You are done.
-
-
-### Run project
-
-To run a race on a single track with graphical display:
-
-- cd src/main
-- uv run single_track_race_display.py
-
-or
-
-- uv run multi_track_race_display.py
-
-To run many races on multiple tracks without graphical display and get the ranked performance of agents:
-
-- cd src/main
-- uv run multirace-nodisplay.py
-
-### Create your own agent
-
-All agents are in src/agents/
-
-Yours is in src/agents/teamX/agentX.py, where X is the number of your team. The initial version plays random actions. Your goal is to improve your agent all along the project and win the races.
-
-You should not touch anything else than your agent.
-
-### Submit your agent
-
-You have to perform a pull request on the source project: https://docs.github.com/fr/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests
-
-The project is here: https://github.com/osigaud/pystk_project
-
-### Watch the current results
-
-The current race results are visible [here](https://osigaud.github.io/pystk_project), they will be updated each week.
-  
 ## AgentSpec
 
 Each controlled kart is parametrized by `pystk2_gymnasium.AgentSpec`:
 
-- `name` defines the name of the player 
+- `name` defines the name of the player
 - `rank_start` defines the starting position (None for random, which is the default)
 - `use_ai` flag (False by default) to ignore actions (when calling `step`,  a SuperTuxKart bot is used instead of using the action)
 - `camera_mode` can be set to `AUTO` (camera on for non STK bots), `ON` (camera on) or `OFF` (no camera).
 
-
 ## Current limitations
 
 -  the agent cannot use graphics information (i.e. pixmap)
-
 
 ## Environments
 
@@ -137,7 +96,7 @@ Wrappers can be used to modify the environment.
 
 ### Polar observations
 
-`pystk2_gymnasium.PolarObservations(env)` changes Cartesian coordinates to polar ones (angle in the horizontal plane, angle in the vertical plan, and distance) of all 3D vectors.
+`pystk2_gymnasium.PolarObservations(env)` changes Cartesian coordinates to polar ones (angle in the horizontal plane, angle in the vertical plane, and distance) of all 3D vectors.
 
 ### Discrete actions
 
@@ -155,7 +114,6 @@ space that combines all the discrete (and multi-discrete) observations, while `c
 
 `pystk2_gymnasium.FlattenMultiDiscreteActions(env)` flattens a multi-discrete action space into a discrete one, with one action per possible unique choice of
 actions. For instance, if the initial space is $\{0, 1\} \times \{0, 1, 2\}$, the action space becomes $\{0, 1, \ldots, 6\}$.
-
 
 ## Multi-agent environment
 
@@ -193,10 +151,3 @@ make_stkenv = partial(
     wrappers=wrappers
 )
 ```
-
-## Multi-map experiment - 50k
-
-The [full experiment guide](src/main/MULTIMAP_50K.md) contains setup, training and
-plotting commands for DAgger and RLPD with three training seeds, three training
-maps and three unseen evaluation maps. Both reuse `datasets/multimap/offline/`.
-The shared settings are in [multimap_50k.yaml](src/main/multimap_50k.yaml).
