@@ -159,7 +159,10 @@ def plot_trajectories(directory, output, width_scale=1.5):
             label, marker, color = styles.get(item_type, (f'Item {item_type}', 'o', '#777777'))
             ax.scatter(group['x'],group['z'],marker=marker,color=color,s=90 if item_type == 2 else 40 if item_type == 3 else 45,
                        edgecolors='white',linewidths=.5,zorder=5,label=label)
-    for name, filename, color, style in zip(MODELS,FILES,['#F3DC62','#2D9CFF','#FF8040'],['--','-',':']):
+    policies = list(zip(MODELS, FILES, ['#F3DC62','#2D9CFF','#FF8040'], ['--','-',':']))
+    if (directory / 'bc.csv').exists():
+        policies.insert(1, ('Behavioral Cloning', 'bc', '#C76BE8', '-.'))
+    for name, filename, color, style in policies:
         rows = pd.read_csv(directory / f'{filename}.csv')
         xy = rows[['x','z']].to_numpy(dtype=float)
         # Don't draw artificial connecting lines across a simulator teleport/rescue.
@@ -213,8 +216,9 @@ def plot_trajectories(directory, output, width_scale=1.5):
     start_handle.set_visible(False)
     ax.autoscale(); ax.set_aspect('equal', adjustable='box')
     ax.set_ylim(-275, 100)
-    ax.set(title=f'Expert, DAgger and RLPD trajectories - {config["track"]}, seed {config["seed"]}',
-           xlabel='Display X (m, lateral offsets scaled)',ylabel='Display Z (m, lateral offsets scaled)')
+    policy_title = 'Expert, Behavioral Cloning, DAgger and RLPD' if (directory / 'bc.csv').exists() else 'Expert, DAgger and RLPD'
+    ax.set(title=config.get('plot_title', f'{policy_title} trajectories on {config["track"].capitalize()} map, seed {config["seed"]}'),
+           xlabel='X (m)',ylabel='Z (m)')
     ax.grid(False)
     for spine in ax.spines.values():
         spine.set_visible(False)
@@ -222,7 +226,7 @@ def plot_trajectories(directory, output, width_scale=1.5):
               handler_map={start_handle: StartFlagHandler()})
     fig.tight_layout()
     output.mkdir(parents=True,exist_ok=True)
-    stem = output / f'trajectories_{config["track"]}_seed{config["seed"]}'
+    stem = output / config.get('plot_stem', f'trajectories_{config["track"]}_seed{config["seed"]}')
     for extension in ('svg',):
         fig.savefig(stem.with_suffix('.'+extension),bbox_inches='tight')
         print(stem.with_suffix('.'+extension))
@@ -230,6 +234,26 @@ def plot_trajectories(directory, output, width_scale=1.5):
 
 
 def run(args):
+    if args.add_bc:
+        config = json.loads((args.data_dir / 'config.json').read_text())
+        destination = args.data_dir / 'bc.csv'
+        if destination.exists():
+            raise FileExistsError(f'{destination} already exists; use --plot-only to reuse it')
+        policy = ActorPolicy.load(args.bc_checkpoint, device=args.device)
+        env = STKRaceEnv(agent=AgentSpec(rank_start=0, use_ai=False), track=config['track'],
+                         num_kart=1, laps=1, step_size=config['step_size'])
+        try:
+            metrics = collect(env, policy, config['seed'], config['max_steps'], destination)
+        finally:
+            env.close()
+        summary = pd.read_csv(args.data_dir / 'summary.csv')
+        summary = pd.concat([summary, pd.DataFrame([dict(model='Behavioral Cloning', **metrics)])], ignore_index=True)
+        summary.to_csv(args.data_dir / 'summary.csv', index=False)
+        config['bc'] = str(args.bc_checkpoint.resolve())
+        (args.data_dir / 'config.json').write_text(json.dumps(config, indent=2))
+        print('Behavioral Cloning:', metrics, flush=True)
+        plot_trajectories(args.data_dir, args.plot_dir, args.width_scale)
+        return
     if args.plot_only:
         plot_trajectories(args.data_dir,args.plot_dir,args.width_scale)
         return
@@ -272,4 +296,6 @@ if __name__ == '__main__':
     parser.add_argument('--width-scale',type=float,default=1.5,
                         help='Visual road width multiplier; 1 preserves simulator widths')
     parser.add_argument('--plot-only',action='store_true')
+    parser.add_argument('--add-bc',action='store_true',help='Record only BC using an existing trajectory dataset configuration')
+    parser.add_argument('--bc-checkpoint',type=Path,default=ROOT/'datasets/protocol/dagger_offline_gaussian_seed1000/actor_iteration_1.pt')
     run(parser.parse_args())

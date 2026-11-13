@@ -85,7 +85,6 @@ def run(args):
         if valid[0]:
             x, y = pixels[0]
             metadata['current_pixel'] = [float(x),float(y)]
-            ax.plot([x,x], [y-60,y+15], color='white', linewidth=2)
         for index in np.flatnonzero(valid[1:]):
             metadata['future_pixels'][index] = pixels[index+1].tolist()
         visible_pixels = pixels[1:][valid[1:]]
@@ -98,9 +97,7 @@ def run(args):
                             textcoords='offset points',color='white')
         metadata['future_pixel'] = metadata['future_pixels'][-1]
     else:
-        # Screen reference only: not a measured projection of the kart position.
-        ax.plot([width/2,width/2], [height*.58,height*.80],color='white',linewidth=2,alpha=.8)
-        ax.text(.02,.96,'Screen-center reference - future projection unavailable',
+        ax.text(.02,.96,'Camera matrices unavailable - future projection unavailable',
                 transform=ax.transAxes,color='white',va='top',
                 bbox=dict(facecolor='black',alpha=.55,edgecolor='none'))
         print('Camera matrices unavailable; no future-position dot was drawn.')

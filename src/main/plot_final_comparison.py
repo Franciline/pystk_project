@@ -9,9 +9,9 @@ import numpy as np
 import pandas as pd
 
 
-def load_results(directory):
+def load_results(directory, checkpoint='best'):
     rows = pd.read_csv(Path(directory) / 'final_test_episodes.csv')
-    rows = rows.loc[rows['checkpoint'] == 'best'].copy().sort_values('seed')
+    rows = rows.loc[rows['checkpoint'] == checkpoint].copy().sort_values('seed')
     if rows.empty or rows['seed'].duplicated().any():
         raise ValueError(f'Missing or duplicate best-checkpoint test seeds: {directory}')
     for key in ('terminated', 'truncated'):
@@ -19,11 +19,19 @@ def load_results(directory):
     return rows.set_index('seed')
 
 
-def plot_comparison(dagger, rlpd, output_dir, dagger_label='DAgger (loaded offline)', rlpd_label='RLPD'):
+def plot_comparison(dagger, rlpd, output_dir, dagger_label='DAgger (loaded offline)', rlpd_label='RLPD', expert=None):
     data = {dagger_label: load_results(dagger), rlpd_label: load_results(rlpd)}
     left, right = data.values()
     if not left.index.equals(right.index):
         raise ValueError('Both actors must have exactly the same final-test seeds')
+    expert_mean = None
+    if expert is not None:
+        baseline = load_results(expert, checkpoint='team4')
+        if not baseline.index.equals(left.index):
+            raise ValueError('Expert and actors must have exactly the same final-test seeds')
+        if not baseline['terminated'].all():
+            raise ValueError('Expert baseline requires completed laps on all test seeds')
+        expert_mean = float(baseline['n_steps'].mean())
     output = Path(output_dir)
     output.mkdir(parents=True, exist_ok=True)
     seeds = left.index.to_numpy()
@@ -76,6 +84,10 @@ def plot_comparison(dagger, rlpd, output_dir, dagger_label='DAgger (loaded offli
         patch.set(facecolor=color, edgecolor=color, alpha=.6)
         ax.scatter(index + offsets, steps, color=color, edgecolor='white',
                    linewidth=.5, alpha=.9, s=34, zorder=3)
+    if expert_mean is not None:
+        ax.axhline(expert_mean, color='#333333', linestyle='--', linewidth=1.4,
+                   label=f'Expert (team4) mean: {expert_mean:.2f} steps')
+        ax.legend(frameon=False, fontsize=10)
     ax.set(title=f'Distribution of episode steps across {len(seeds)} test seeds',
            ylabel='Episode steps')
     fig.tight_layout()
@@ -100,5 +112,6 @@ if __name__ == '__main__':
     parser.add_argument('--output-dir', type=Path, default=Path('datasets/plots'))
     parser.add_argument('--dagger-label', default='DAgger (loaded offline)')
     parser.add_argument('--rlpd-label', default='RLPD')
+    parser.add_argument('--expert', type=Path, help='Team4 run folder with matched final_test_episodes.csv')
     args = parser.parse_args()
-    plot_comparison(args.dagger, args.rlpd, args.output_dir, args.dagger_label, args.rlpd_label)
+    plot_comparison(args.dagger, args.rlpd, args.output_dir, args.dagger_label, args.rlpd_label, expert=args.expert)
